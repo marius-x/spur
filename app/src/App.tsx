@@ -24,7 +24,7 @@ const App: FC = () => (
         </Space>
         <Space style={{ float: "right" }}><WalletMultiButton /></Space>
       </Header>
-      <Content style={{ padding: "25px 50px", minHeight: "360px", textAlign: "center" }}>
+      <Content style={{ padding: "25px 50px", minHeight: "360px"}}>
         <Switch>
           <Route path="/about">
             <About />

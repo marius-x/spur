@@ -9,9 +9,33 @@ pub mod spur {
     use super::*;
 
     const VEST_PDA_SEED: &[u8] = b"vest";
+    //const TREASURY_SEED: &str = "treasury";
 
-    pub fn initialize(
-        ctx: Context<Initialize>,
+    pub fn init_treasury(
+        ctx: Context<InitTreasury>,
+        mint_address: Pubkey,
+        bump: u8
+    ) -> ProgramResult {
+        let treasury_account = &mut ctx.accounts.treasury_account;
+        if treasury_account.initialized {
+            return Err(ProgramError::AccountAlreadyInitialized);
+        }
+        // let owner_address: Pubkey = ctx.accounts.authority.key();
+        // let owner_treasury_address: Pubkey = Pubkey::create_with_seed(
+        //     &owner_address, TREASURY_SEED, ctx.program_id)?;
+        // if owner_treasury_address != treasury_account.key() {
+        //     return Err(ProgramError::IllegalOwner);
+        // }
+        treasury_account.initialized = true;
+        treasury_account.owner_address = ctx.accounts.authority.key();
+        treasury_account.mint_address = mint_address;
+        treasury_account.bump = bump;
+        treasury_account.vesting_addresses = Vec::new();
+        Ok(())
+    }
+
+    pub fn init_vesting(
+        ctx: Context<InitVesting>,
         mint_address: Pubkey,
         vesting_token_address: Pubkey,
         dest_token_address: Pubkey,
@@ -25,12 +49,13 @@ pub mod spur {
         vesting_account.release_time = release_time;
         vesting_account.vesting_token_address = vesting_token_address;
 
+        let treasury_account = &mut ctx.accounts.treasury_account;
+        treasury_account.vesting_addresses.push(vesting_account.key());
+
         let (pda, _bump_seed) = Pubkey::find_program_address(&[VEST_PDA_SEED], ctx.program_id);
         vesting_account.pda = pda;
 
         token::set_authority(ctx.accounts.into(), AuthorityType::AccountOwner, Some(pda))?;
-
-        
         // token::transfer(
         //     ctx.accounts.into_vesting_token_account_context(),
         //     amount,
@@ -65,7 +90,23 @@ pub mod spur {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+#[instruction(mint: Pubkey, bump: u8)]
+pub struct InitTreasury<'info> {
+    #[account(
+        init,
+        seeds = [authority.key().as_ref()],
+        bump = bump,
+        payer = authority,
+        space = 320,
+    )]
+    pub treasury_account: Account<'info, TreasuryAccount>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>
+}
+
+#[derive(Accounts)]
+pub struct InitVesting<'info> {
     #[account(init, payer = user, space = 8 + 32 + 32 + 32 + 32 + 8 + 8)]
     pub vesting_account: Account<'info, VestingAccount>,
     #[account(
@@ -73,16 +114,18 @@ pub struct Initialize<'info> {
         //constraint = escrow_account.taker_amount <= taker_deposit_token_account.amount,
     )]
     pub vesting_token_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = treasury_account.owner_address == user.key())]
+    pub treasury_account: Account<'info, TreasuryAccount>,
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> From<&mut Initialize<'info>>
+impl<'info> From<&mut InitVesting<'info>>
     for CpiContext<'_, '_, '_, 'info, SetAuthority<'info>>
 {
-    fn from(accounts: &mut Initialize<'info>) -> Self {
+    fn from(accounts: &mut InitVesting<'info>) -> Self {
         let cpi_accounts = SetAuthority {
             account_or_mint: accounts
                 .vesting_token_account
@@ -117,6 +160,15 @@ impl<'info> Unlock<'info> {
         let cpi_program = self.token_program.to_account_info();
         CpiContext::new(cpi_program, cpi_accounts)
     }
+}
+
+#[account]
+pub struct TreasuryAccount {
+    pub initialized: bool,
+    pub owner_address: Pubkey,
+    pub mint_address: Pubkey,
+    pub bump: u8,
+    pub vesting_addresses: Vec<Pubkey>
 }
 
 #[account]

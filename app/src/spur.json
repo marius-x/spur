@@ -3,7 +3,37 @@
   "name": "spur",
   "instructions": [
     {
-      "name": "initialize",
+      "name": "initTreasury",
+      "accounts": [
+        {
+          "name": "treasuryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "mintAddress",
+          "type": "publicKey"
+        },
+        {
+          "name": "bump",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initVesting",
       "accounts": [
         {
           "name": "vestingAccount",
@@ -12,6 +42,11 @@
         },
         {
           "name": "vestingTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "treasuryAccount",
           "isMut": true,
           "isSigner": false
         },
@@ -92,6 +127,36 @@
     }
   ],
   "accounts": [
+    {
+      "name": "TreasuryAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "initialized",
+            "type": "bool"
+          },
+          {
+            "name": "ownerAddress",
+            "type": "publicKey"
+          },
+          {
+            "name": "mintAddress",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vestingAddresses",
+            "type": {
+              "vec": "publicKey"
+            }
+          }
+        ]
+      }
+    },
     {
       "name": "VestingAccount",
       "type": {
