@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, SetAuthority, Token, TokenAccount, Transfer};
 use spl_token::instruction::AuthorityType;
+use std::mem::size_of;
 
 declare_id!("6ojRC5neU8YLjfiR3igYvxPyuJLfjYYASfoioPsCamAV");
 
@@ -8,85 +9,102 @@ declare_id!("6ojRC5neU8YLjfiR3igYvxPyuJLfjYYASfoioPsCamAV");
 pub mod spur {
     use super::*;
 
-    const VEST_PDA_SEED: &[u8] = b"vest";
-    //const TREASURY_SEED: &str = "treasury";
+    //const TREASURY_PDA_SEED: &[u8] = b"treasury";
+    const GRANT_PDA_SEED: &[u8] = b"grant";
 
     pub fn init_treasury(
         ctx: Context<InitTreasury>,
-        mint_address: Pubkey,
         bump: u8
     ) -> ProgramResult {
         let treasury_account = &mut ctx.accounts.treasury_account;
+
         if treasury_account.initialized {
             return Err(ProgramError::AccountAlreadyInitialized);
         }
-        // let owner_address: Pubkey = ctx.accounts.authority.key();
-        // let owner_treasury_address: Pubkey = Pubkey::create_with_seed(
-        //     &owner_address, TREASURY_SEED, ctx.program_id)?;
-        // if owner_treasury_address != treasury_account.key() {
+        let authority_wallet: Pubkey = ctx.accounts.authority_wallet.key();
+        
+        // let treasury_account_address = Pubkey::create_program_address(
+        //     &[authority_wallet.as_ref(), &TREASURY_PDA_SEED[..], &[bump]], ctx.program_id).
+        //     map_err(|_| ProgramError::InvalidSeeds)?;
+        // if treasury_account_address != treasury_account.key() {
         //     return Err(ProgramError::IllegalOwner);
         // }
         treasury_account.initialized = true;
-        treasury_account.owner_address = ctx.accounts.authority.key();
-        treasury_account.mint_address = mint_address;
+        treasury_account.authority_wallet = authority_wallet;
         treasury_account.bump = bump;
-        treasury_account.vesting_addresses = Vec::new();
+        treasury_account.grant_accounts = Vec::new();
+
         Ok(())
     }
 
-    pub fn init_vesting(
-        ctx: Context<InitVesting>,
+    pub fn init_grant(
+        ctx: Context<InitGrant>,
         mint_address: Pubkey,
-        vesting_token_address: Pubkey,
-        dest_token_address: Pubkey,
-        amount: u64,
-        release_time: u64,
+        option_market_key: Option<Pubkey>,
+        amount_total: u64,
+        issue_ts: i64,
+        duration_sec: u64,
+        initial_cliff_sec: u64,
+        vest_interval_sec: u64,
+        sender_wallet: Pubkey,
+        recipient_wallet: Pubkey,
+        grant_token_account: Pubkey,
     ) -> ProgramResult {
-        let vesting_account = &mut ctx.accounts.vesting_account;
-        vesting_account.mint_address = mint_address;
-        vesting_account.dest_token_address = dest_token_address;
-        vesting_account.amount = amount;
-        vesting_account.release_time = release_time;
-        vesting_account.vesting_token_address = vesting_token_address;
+        let grant_account = &mut ctx.accounts.grant_account;
+        grant_account.mint_address = mint_address;
+        grant_account.option_market_key = option_market_key;
+        grant_account.amount_total = amount_total;
+        grant_account.issue_ts = issue_ts;
+        grant_account.duration_sec = duration_sec;
+        grant_account.initial_cliff_sec = initial_cliff_sec;
+        grant_account.vest_interval_sec = vest_interval_sec;
+        grant_account.sender_wallet = sender_wallet;
+        grant_account.recipient_wallet = recipient_wallet;
+        grant_account.grant_token_account = grant_token_account;
 
         let treasury_account = &mut ctx.accounts.treasury_account;
-        treasury_account.vesting_addresses.push(vesting_account.key());
+        treasury_account.grant_accounts.push(grant_account.key());
 
-        let (pda, _bump_seed) = Pubkey::find_program_address(&[VEST_PDA_SEED], ctx.program_id);
-        vesting_account.pda = pda;
+        let (pda, _bump_seed) = Pubkey::find_program_address(&[GRANT_PDA_SEED], ctx.program_id);
+        grant_account.pda = pda;
 
         token::set_authority(ctx.accounts.into(), AuthorityType::AccountOwner, Some(pda))?;
-        // token::transfer(
-        //     ctx.accounts.into_vesting_token_account_context(),
-        //     amount,
-        // )?;
-
         Ok(())
     }
 
-    pub fn unlock(
-        ctx: Context<Unlock>,
+    pub fn remove_grant_from_treasury(
+        ctx: Context<RemoveGrantFromTreasury>,
+        grant_account: Pubkey,
     ) -> ProgramResult {
-        let (_pda, bump_seed) = Pubkey::find_program_address(&[VEST_PDA_SEED], ctx.program_id);
-        let seeds = &[&VEST_PDA_SEED[..], &[bump_seed]];
-
-        token::transfer(
-            ctx.accounts
-                .into_transfer_context()
-                .with_signer(&[&seeds[..]]),
-                ctx.accounts.vesting_account.amount,
-        )?;
-
-        // token::set_authority(
-        //     ctx.accounts
-        //         .into_set_authority_context()
-        //         .with_signer(&[&seeds[..]]),
-        //     AuthorityType::AccountOwner,
-        //     Some(ctx.accounts.escrow_account.initializer_key),
-        // )?;
-
+        let treasury_account = &mut ctx.accounts.treasury_account;
+        let index = treasury_account.grant_accounts.iter().position(|&r| r == grant_account).unwrap();
+        treasury_account.grant_accounts.remove(index);
         Ok(())
     }
+
+    // pub fn unlock(
+    //     ctx: Context<UnlockGrant>,
+    // ) -> ProgramResult {
+    //     let (_pda, bump_seed) = Pubkey::find_program_address(&[GRANT_PDA_SEED], ctx.program_id);
+    //     let seeds = &[&GRANT_PDA_SEED[..], &[bump_seed]];
+
+    //     token::transfer(
+    //         ctx.accounts
+    //             .into_transfer_context()
+    //             .with_signer(&[&seeds[..]]),
+    //             ctx.accounts.grant_account.amount_total,
+    //     )?;
+
+    //     // token::set_authority(
+    //     //     ctx.accounts
+    //     //         .into_set_authority_context()
+    //     //         .with_signer(&[&seeds[..]]),
+    //     //     AuthorityType::AccountOwner,
+    //     //     Some(ctx.accounts.escrow_account.initializer_key),
+    //     // )?;
+
+    //     Ok(())
+    // }
 }
 
 #[derive(Accounts)]
@@ -94,89 +112,111 @@ pub mod spur {
 pub struct InitTreasury<'info> {
     #[account(
         init,
-        seeds = [authority.key().as_ref()],
+        seeds = [authority_wallet.key().as_ref()],
         bump = bump,
-        payer = authority,
-        space = 320,
+        payer = authority_wallet,
+        space = 320 //8 + size_of::<TreasuryAccount>() + 10 * size_of::<Pubkey>(),
     )]
     pub treasury_account: Account<'info, TreasuryAccount>,
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub authority_wallet: Signer<'info>,
     pub system_program: Program<'info, System>
 }
 
 #[derive(Accounts)]
-pub struct InitVesting<'info> {
-    #[account(init, payer = user, space = 8 + 32 + 32 + 32 + 32 + 8 + 8)]
-    pub vesting_account: Account<'info, VestingAccount>,
+pub struct AddGrantToTreasury<'info> {
+    #[account(mut)]
+    pub treasury_account: Account<'info, TreasuryAccount>,
+    pub grant_account: Account<'info, GrantAccount>
+}
+
+#[derive(Accounts)]
+pub struct RemoveGrantFromTreasury<'info> {
+    #[account(mut)]
+    pub treasury_account: Account<'info, TreasuryAccount>
+}
+
+#[derive(Accounts)]
+#[instruction(amount_total: u64)]
+pub struct InitGrant<'info> {
+    #[account(init, payer = authority_wallet, space = 8 + size_of::<GrantAccount>())]
+    pub grant_account: Account<'info, GrantAccount>,
     #[account(
         mut,
-        //constraint = escrow_account.taker_amount <= taker_deposit_token_account.amount,
+        constraint = grant_token_account.amount >= amount_total
     )]
-    pub vesting_token_account: Account<'info, TokenAccount>,
-    #[account(mut, constraint = treasury_account.owner_address == user.key())]
+    pub grant_token_account: Account<'info, TokenAccount>,
+    #[account(mut, constraint = treasury_account.authority_wallet == authority_wallet.key())]
     pub treasury_account: Account<'info, TreasuryAccount>,
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub authority_wallet: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
 }
 
-impl<'info> From<&mut InitVesting<'info>>
+impl<'info> From<&mut InitGrant<'info>>
     for CpiContext<'_, '_, '_, 'info, SetAuthority<'info>>
 {
-    fn from(accounts: &mut InitVesting<'info>) -> Self {
+    fn from(accounts: &mut InitGrant<'info>) -> Self {
         let cpi_accounts = SetAuthority {
             account_or_mint: accounts
-                .vesting_token_account
+                .grant_token_account
                 .to_account_info()
                 .clone(),
-            current_authority: accounts.user.to_account_info().clone(),
+            current_authority: accounts.authority_wallet.to_account_info().clone(),
         };
         let cpi_program = accounts.token_program.to_account_info();
         CpiContext::new(cpi_program, cpi_accounts)
     }
 }
 
-#[derive(Accounts)]
-pub struct Unlock<'info> {
-    pub vesting_account: Account<'info, VestingAccount>,
-    #[account(mut)]
-    pub vesting_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub dest_token_account: Account<'info, TokenAccount>,
-    pub pda_account: AccountInfo<'info>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-}
+// #[derive(Accounts)]
+// pub struct UnlockGrant<'info> {
+//     #[account(mut)]
+//     pub grant_account: Account<'info, GrantAccount>,
+//     #[account(mut)]
+//     pub grant_token_account: Account<'info, TokenAccount>,
+//     #[account(mut)]
+//     pub dest_token_account: Account<'info, TokenAccount>,
+//     pub pda_account: AccountInfo<'info>,
+//     pub system_program: Program<'info, System>,
+//     pub token_program: Program<'info, Token>,
+// }
 
-impl<'info> Unlock<'info> {
-    fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
-        let cpi_accounts = Transfer {
-            from: self.vesting_token_account.to_account_info().clone(),
-            to: self.dest_token_account.to_account_info().clone(),
-            authority: self.pda_account.clone(),
-        };
-        let cpi_program = self.token_program.to_account_info();
-        CpiContext::new(cpi_program, cpi_accounts)
-    }
-}
+// impl<'info> UnlockGrant<'info> {
+//     fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+//         let cpi_accounts = Transfer {
+//             from: self.grant_token_account.to_account_info().clone(),
+//             to: self.dest_token_account.to_account_info().clone(),
+//             authority: self.pda_account.clone(),
+//         };
+//         let cpi_program = self.token_program.to_account_info();
+//         CpiContext::new(cpi_program, cpi_accounts)
+//     }
+// }
 
 #[account]
 pub struct TreasuryAccount {
     pub initialized: bool,
-    pub owner_address: Pubkey,
-    pub mint_address: Pubkey,
+    pub authority_wallet: Pubkey,
     pub bump: u8,
-    pub vesting_addresses: Vec<Pubkey>
+    pub grant_accounts: Vec<Pubkey>
 }
 
 #[account]
-pub struct VestingAccount {
+pub struct GrantAccount {
     pub mint_address: Pubkey,
-    pub vesting_token_address: Pubkey,
-    pub dest_token_address: Pubkey,
+    pub option_market_key: Option<Pubkey>,
+    pub amount_total: u64,
+    pub issue_ts: i64,
+    pub duration_sec: u64,
+    pub initial_cliff_sec: u64,
+    pub vest_interval_sec: u64,
+    pub sender_wallet: Pubkey,
+    pub recipient_wallet: Pubkey,
+    pub grant_token_account: Pubkey,
+    pub last_unlock_ts: i64,
+    pub amount_unlocked: u64,
+    pub revoked: bool,
     pub pda: Pubkey,
-    pub amount: u64,
-    pub release_time: u64,
 }

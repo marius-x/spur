@@ -20,7 +20,7 @@ const App: FC = () => (
     <Layout>
       <Header>
         <Space>
-          <Link to="/"><Title level={3} style={{ color: "#f5f1ee" }}>Pacifico</Title></Link>
+          <Link to="/"><Title level={3} style={{ color: "#f5f1ee" }}>Owner Comp</Title></Link>
         </Space>
         <Space style={{ float: "right" }}><WalletMultiButton /></Space>
       </Header>
@@ -35,7 +35,7 @@ const App: FC = () => (
         </Switch>
       </Content>
       <Footer style={{ textAlign: "center", position: "fixed", bottom: "0", width: "100%" }}>
-        Pacifico © 2021
+        Owner Comp © 2021
       </Footer>
     </Layout>
   </Router>
