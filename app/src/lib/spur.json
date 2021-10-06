@@ -122,6 +122,47 @@
           "type": "publicKey"
         }
       ]
+    },
+    {
+      "name": "unlockGrant",
+      "accounts": [
+        {
+          "name": "grantAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "grantTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "destTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "pdaAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "clock",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     }
   ],
   "accounts": [

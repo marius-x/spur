@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
 import idl from "./spur.json";
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { clusterApiUrl, ConfirmOptions, TransactionInstruction } from '@solana/web3.js';
@@ -19,9 +19,7 @@ const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey(
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
 );
 
-const enc = new TextEncoder();
 const TREASURY_PDA_SEED = "treasury";
-const TREASURY_PDA_SEED_BUFFER = enc.encode(TREASURY_PDA_SEED);
 
 const getEndpoint = () => {
   if (IS_LOCAL_NETWORK) {
@@ -93,14 +91,14 @@ export interface GrantAccount {
   mintAddress: BN,
   optionMarketKey: BN,
   amountTotal: BN,
-  issueTime: BN,
+  issueTs: BN,
   durationSec: BN,
   initialCliffSec: BN,
   vestIntervalSec: BN,
   senderWallet: BN,
   recipientWallet: BN,
-  grantTokenAcount: BN,
-  lastUnlockTime: BN,
+  grantTokenAccount: BN,
+  lastUnlockTs: BN,
   amountUnlocked: BN,
   revoked: boolean,
   pda: BN
@@ -121,7 +119,7 @@ export function useTreasuryAccountPk() {
         return;
       }
       const [pk] = await PublicKey.findProgramAddress(
-        [wallet.publicKey.toBuffer()],
+        [wallet.publicKey.toBuffer(), Buffer.from(TREASURY_PDA_SEED)],
         program.programId
       );
       setTreasuryAccountPk(pk);
@@ -172,7 +170,6 @@ export function useGrantAccount(pk: PublicKey) {
         return;
       }
       try {
-        console.log("loading " + pk);
         const grant = await program.account.grantAccount.fetch(pk) as GrantAccount;
         setAccount(grant);
       } catch (err) {
@@ -197,7 +194,7 @@ export async function initTreasury(
     throw new Error("Empty wallet publicKey");
   }
   const [treasuryPk, bump] = await PublicKey.findProgramAddress(
-    [wallet.publicKey.toBuffer()],
+    [wallet.publicKey.toBuffer(), Buffer.from(TREASURY_PDA_SEED)],
     program.programId
   );
   await program.rpc.initTreasury(bump, {
@@ -356,6 +353,63 @@ export async function removeGrantFromTreasury(
     {
       accounts: {
         treasuryAccount
+      }
+    }
+  );
+}
+
+export async function revokeGrant(
+  provider: Provider, 
+  program: Program, 
+  wallet: WalletContextState,
+  treasuryAccount: PublicKey,
+  grantAccount: PublicKey 
+) {
+  console.log("revoke not impl!");
+  // await program.rpc.removeGrantFromTreasury(
+  //   grantAccount, 
+  //   {
+  //     accounts: {
+  //       treasuryAccount
+  //     }
+  //   }
+  // );
+}
+
+export async function unlockGrant(
+  provider: Provider, 
+  program: Program, 
+  wallet: WalletContextState,
+  treasuryAccount: PublicKey,
+  grantPk: PublicKey,
+  grant: GrantAccount
+) {
+  const destTokenAccountPk = await Token.getAssociatedTokenAddress(
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    new PublicKey(grant.recipientWallet.toString()),
+    wallet.publicKey!
+  );
+  const accounts = {
+    grantAccount: grantPk,
+    grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
+    destTokenAccount: destTokenAccountPk,
+    pdaAccount: new PublicKey(grant.pda.toString()),
+    systemProgram: SystemProgram.programId,
+    tokenProgram: TOKEN_PROGRAM_ID,
+    clock: SYSVAR_CLOCK_PUBKEY,
+  };
+  console.log("accounts", accounts);
+  await program.rpc.unlockGrant(
+    {
+      accounts: {
+        grantAccount: grantPk,
+        grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
+        destTokenAccount: destTokenAccountPk,
+        pdaAccount: new PublicKey(grant.pda.toString()),
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        clock: SYSVAR_CLOCK_PUBKEY,
       }
     }
   );

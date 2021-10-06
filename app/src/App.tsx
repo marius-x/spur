@@ -10,7 +10,7 @@ import {
 import { getPhantomWallet, getSolletWallet } from '@solana/wallet-adapter-wallets';
 import { WalletProvider, ConnectionProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import Home from './Home';
+import Home from './components/Home';
 import './App.less';
 
 const { Title } = Typography;
