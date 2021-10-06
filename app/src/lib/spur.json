@@ -13,7 +13,7 @@
         {
           "name": "authorityWallet",
           "isMut": true,
-          "isSigner": false
+          "isSigner": true
         },
         {
           "name": "systemProgram",
@@ -42,13 +42,18 @@
           "isSigner": false
         },
         {
-          "name": "treasuryAccount",
+          "name": "senderWallet",
           "isMut": true,
-          "isSigner": false
+          "isSigner": true
         },
         {
-          "name": "authorityWallet",
+          "name": "recipientWallet",
           "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "mint",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -102,7 +107,32 @@
           "type": "publicKey"
         },
         {
+          "name": "recipientTokenAccount",
+          "type": "publicKey"
+        },
+        {
           "name": "grantTokenAccount",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "addGrantToTreasury",
+      "accounts": [
+        {
+          "name": "treasuryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "grantAccount",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "grantAccount",
           "type": "publicKey"
         }
       ]
@@ -137,7 +167,7 @@
           "isSigner": false
         },
         {
-          "name": "destTokenAccount",
+          "name": "recipientTokenAccount",
           "isMut": true,
           "isSigner": false
         },
@@ -236,6 +266,10 @@
             "type": "publicKey"
           },
           {
+            "name": "recipientTokenAccount",
+            "type": "publicKey"
+          },
+          {
             "name": "grantTokenAccount",
             "type": "publicKey"
           },
@@ -260,6 +294,6 @@
     }
   ],
   "metadata": {
-    "address": "6ojRC5neU8YLjfiR3igYvxPyuJLfjYYASfoioPsCamAV"
+    "address": "H4tVcJrkbYgMvVQNHeLcicDqVnaHHrmUUpyVHvhN3MDh"
   }
 }
