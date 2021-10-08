@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token;
-// use spl_associated_token_account::{get_associated_token_address};
+use spl_associated_token_account::{get_associated_token_address};
 // //use spl_token::instruction::AuthorityType;
 // use anchor_spl::associated_token;
 
@@ -104,9 +104,17 @@ pub mod spur {
         ctx: Context<UnlockGrant>,
     ) -> ProgramResult {
         let grant_account = &ctx.accounts.grant_account;
+        let expected_token_account = get_associated_token_address(
+            &grant_account.recipient_wallet.clone(),
+            &grant_account.mint_address.clone()
+        );
+        if expected_token_account !=
+            *ctx.accounts.recipient_token_account.to_account_info().key {
+            msg!("Invalid recipient associated token account!");
+            return Err(ProgramError::InvalidArgument);
+        }
         let grant_start_ts = grant_account.issue_ts;
         let grant_end_ts = grant_account.issue_ts + grant_account.duration_sec as i64;
-
         let unlock_end_ts = ctx.accounts.clock.unix_timestamp as i64;
 
         if grant_account.initial_cliff_sec > 0 {
@@ -134,9 +142,12 @@ pub mod spur {
             unlock_amount = amount_per_period * unlock_num_periods;
         }
 
-        let (_pda, bump_seed) = Pubkey::find_program_address(&[GRANT_PDA_SEED], ctx.program_id);
-        let seeds = &[&GRANT_PDA_SEED[..], &[bump_seed]];
+        if unlock_amount == 0 {
+            msg!("No amount to unlock!");
+            return Err(ProgramError::InvalidArgument);
+        }
 
+        let seeds = &[&GRANT_PDA_SEED[..], &[grant_account.bump]];
         token::transfer(
             ctx.accounts
                 .into_transfer_context()
