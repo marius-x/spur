@@ -1,16 +1,17 @@
 use anchor_lang::prelude::*;
-//use spl_associated_token_account::{get_associated_token_address};
-use spl_token::instruction::AuthorityType;
 use anchor_spl::token;
+// use spl_associated_token_account::{get_associated_token_address};
+// //use spl_token::instruction::AuthorityType;
+// use anchor_spl::associated_token;
+
+
 
 use context::*;
 
 mod account;
 mod context;
 
-declare_id!("H4tVcJrkbYgMvVQNHeLcicDqVnaHHrmUUpyVHvhN3MDh");
-
-const GRANT_PDA_SEED: &[u8] = b"grant";
+declare_id!("2Tz77YyGmRYXgSeNmPhcQBFoapAgfRTixz7fm5Uk8BXF");
 
 #[program]
 pub mod spur {
@@ -28,47 +29,6 @@ pub mod spur {
         treasury_account.authority_wallet = ctx.accounts.authority_wallet.key();
         treasury_account.bump = bump;
         treasury_account.grant_accounts = Vec::new();
-        Ok(())
-    }
-
-    pub fn init_grant(
-        ctx: Context<InitGrant>,
-        mint_address: Pubkey,
-        option_market_key: Option<Pubkey>,
-        amount_total: u64,
-        issue_ts: i64,
-        duration_sec: u64,
-        initial_cliff_sec: u64,
-        vest_interval_sec: u64,
-        sender_wallet: Pubkey,
-        recipient_wallet: Pubkey,
-        recipient_token_account: Pubkey,
-        grant_token_account: Pubkey,
-    ) -> ProgramResult {
-        let grant_account = &mut ctx.accounts.grant_account;
-        grant_account.mint_address = mint_address;
-        grant_account.option_market_key = option_market_key;
-        grant_account.amount_total = amount_total;
-        grant_account.issue_ts = issue_ts;
-        grant_account.duration_sec = duration_sec;
-        grant_account.initial_cliff_sec = initial_cliff_sec;
-        grant_account.vest_interval_sec = vest_interval_sec;
-        grant_account.sender_wallet = sender_wallet;
-        grant_account.recipient_wallet = recipient_wallet;
-        grant_account.recipient_token_account = recipient_token_account;
-        grant_account.grant_token_account = grant_token_account;
-
-        // let dest_token_account = get_associated_token_address(
-        //     &grant_account.recipient_wallet, &grant_account.mint_address);
-        // if dest_token_account != recipient_token_account {
-        //     msg!("Invalid recipient token account!");
-        //     return Err(ProgramError::InvalidArgument);
-        // }
-
-        let (pda, _bump_seed) = Pubkey::find_program_address(&[GRANT_PDA_SEED], ctx.program_id);
-        grant_account.pda = pda;
-
-        token::set_authority(ctx.accounts.into(), AuthorityType::AccountOwner, Some(pda))?;
         Ok(())
     }
 
@@ -92,6 +52,51 @@ pub mod spur {
             return Err(ProgramError::InvalidArgument);
         }
         treasury_account.grant_accounts.remove(index.unwrap());
+        Ok(())
+    }
+
+    pub fn init_grant(
+        ctx: Context<InitGrant>,
+        bump: u8,
+        option_market_key: Option<Pubkey>,
+        amount_total: u64,
+        issue_ts: i64,
+        duration_sec: u64,
+        initial_cliff_sec: u64,
+        vest_interval_sec: u64,
+        recipient_wallet: Pubkey,
+    ) -> ProgramResult {
+        let grant_account = &mut ctx.accounts.grant_account;
+        grant_account.pda = ctx.accounts.pda.key();
+        grant_account.bump = bump;
+        grant_account.mint_address = ctx.accounts.mint.key();
+        grant_account.option_market_key = option_market_key;
+        grant_account.amount_total = amount_total;
+        grant_account.issue_ts = issue_ts;
+        grant_account.duration_sec = duration_sec;
+        grant_account.initial_cliff_sec = initial_cliff_sec;
+        grant_account.vest_interval_sec = vest_interval_sec;
+        grant_account.sender_wallet = ctx.accounts.sender_wallet.key();
+        grant_account.recipient_wallet = recipient_wallet;
+        grant_account.grant_token_account = ctx.accounts.grant_token_account.key();
+        grant_account.last_unlock_ts = 0;
+        grant_account.amount_unlocked = 0;
+        grant_account.revoked = false;
+        token::transfer(ctx.accounts.into(), amount_total)?;
+        Ok(())
+    }
+
+    pub fn revoke_grant(
+        ctx: Context<RevokeGrant>,
+    ) -> ProgramResult {
+        let grant_account = &mut ctx.accounts.grant_account;
+        grant_account.revoked = true;
+        let seeds = &[&GRANT_PDA_SEED[..], &[grant_account.bump]];
+        token::transfer(
+            ctx.accounts
+                .into_transfer_context()
+                .with_signer(&[&seeds[..]]), 
+            ctx.accounts.grant_token_account.amount)?;
         Ok(())
     }
 

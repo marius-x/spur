@@ -37,7 +37,17 @@
           "isSigner": true
         },
         {
+          "name": "grantPda",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "grantTokenAccount",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "recipientTokenAccount",
           "isMut": true,
           "isSigner": false
         },
@@ -49,7 +59,7 @@
         {
           "name": "recipientWallet",
           "isMut": true,
-          "isSigner": true
+          "isSigner": false
         },
         {
           "name": "mint",
@@ -65,12 +75,22 @@
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "mintAddress",
-          "type": "publicKey"
+          "name": "bump",
+          "type": "u8"
         },
         {
           "name": "optionMarketKey",
@@ -104,14 +124,6 @@
         },
         {
           "name": "recipientWallet",
-          "type": "publicKey"
-        },
-        {
-          "name": "recipientTokenAccount",
-          "type": "publicKey"
-        },
-        {
-          "name": "grantTokenAccount",
           "type": "publicKey"
         }
       ]
@@ -288,6 +300,10 @@
           {
             "name": "pda",
             "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

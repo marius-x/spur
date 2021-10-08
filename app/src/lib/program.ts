@@ -8,7 +8,7 @@ import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { Token, TOKEN_PROGRAM_ID, AccountLayout } from "@solana/spl-token";
 import BN from "bn.js";
 
-const { SystemProgram, Keypair } = web3;
+const { SystemProgram, Keypair, SYSVAR_RENT_PUBKEY } = web3;
 
 export const programId = new PublicKey(idl.metadata.address);
 
@@ -226,27 +226,27 @@ export async function initGrant(
   console.log(`grantAccount: ${grantAccount.publicKey}`);
   console.log(`grantTokenAccount: ${grantTokenAccount.publicKey}`);
 
-  const createGrantTokenAccountIx = SystemProgram.createAccount({
-    programId: TOKEN_PROGRAM_ID,
-    space: AccountLayout.span,
-    lamports: await provider.connection.getMinimumBalanceForRentExemption(AccountLayout.span, 'singleGossip'),
-    fromPubkey: wallet.publicKey!,
-    newAccountPubkey: grantTokenAccount.publicKey
-  });
+  // const createGrantTokenAccountIx = SystemProgram.createAccount({
+  //   programId: TOKEN_PROGRAM_ID,
+  //   space: AccountLayout.span,
+  //   lamports: await provider.connection.getMinimumBalanceForRentExemption(AccountLayout.span, 'singleGossip'),
+  //   fromPubkey: wallet.publicKey!,
+  //   newAccountPubkey: grantTokenAccount.publicKey
+  // });
 
-  const initGrantTokenAccountIx = Token.createInitAccountInstruction(
-    TOKEN_PROGRAM_ID, 
-    mintAddress,
-    grantTokenAccount.publicKey, 
-    wallet.publicKey!
-  );
+  // const initGrantTokenAccountIx = Token.createInitAccountInstruction(
+  //   TOKEN_PROGRAM_ID, 
+  //   mintAddress,
+  //   grantTokenAccount.publicKey, 
+  //   wallet.publicKey!
+  // );
 
-  const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
-    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-    TOKEN_PROGRAM_ID,
-    mintAddress,
-    wallet.publicKey!
-  );
+  // const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
+  //   SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+  //   TOKEN_PROGRAM_ID,
+  //   mintAddress,
+  //   wallet.publicKey!
+  // );
 
   // const destTokenAccountPk = await Token.getAssociatedTokenAddress(
   //   SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
@@ -255,14 +255,14 @@ export async function initGrant(
   //   recipientWalletAddress
   // );
 
-  const transferToVestingAccountIx = Token.createTransferInstruction(
-    TOKEN_PROGRAM_ID,
-    srcTokenAccountPk,
-    grantTokenAccount.publicKey,
-    wallet.publicKey!,
-    [],
-    amountTotal
-  );
+  // const transferToVestingAccountIx = Token.createTransferInstruction(
+  //   TOKEN_PROGRAM_ID,
+  //   srcTokenAccountPk,
+  //   grantTokenAccount.publicKey,
+  //   wallet.publicKey!,
+  //   [],
+  //   amountTotal
+  // );
 
   let effectiveMintAddress = mintAddress;
   let optionsIxs: TransactionInstruction[] = [];
@@ -288,8 +288,18 @@ export async function initGrant(
   //   "recipient", recipientWalletAddress.toString(),
   //   "grantToken", grantTokenAccount.publicKey.toString());
 
+  ////////
+  const [grantPdaPk, bump] = await PublicKey.findProgramAddress([Buffer.from("grant")], programId);
+  const recipientTokenPk = await Token.getAssociatedTokenAddress(
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    recipientWalletAddress,
+    wallet.publicKey!
+  );
+  ///////
+
   await program.rpc.initGrant(
-    effectiveMintAddress,
+    bump,
     optMarketKey,
     new BN(amountTotal),
     new BN(issueDate.getTime() / 1000),
@@ -298,21 +308,25 @@ export async function initGrant(
     new BN(vestIntervalSec),
     wallet.publicKey,
     recipientWalletAddress,
-    grantTokenAccount.publicKey,
     {
-      instructions: [
-        ...optionsIxs,
-        createGrantTokenAccountIx,
-        initGrantTokenAccountIx,
-        transferToVestingAccountIx
-      ],
+      // instructions: [
+      //   ...optionsIxs,
+      //   createGrantTokenAccountIx,
+      //   //initGrantTokenAccountIx,
+      //   transferToVestingAccountIx
+      // ],
       accounts: {
         grantAccount: grantAccount.publicKey,
+        grantPda: grantPdaPk,
         grantTokenAccount: grantTokenAccount.publicKey,
-        treasuryAccount: treasuryAccount,
-        authorityWallet: provider.wallet.publicKey,
+        recipientTokenAccount: recipientTokenPk,
+        senderWallet: provider.wallet.publicKey,
+        recipientWallet: recipientWalletAddress,
+        mint: mintAddress,
         systemProgram: SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+        rent: SYSVAR_RENT_PUBKEY
       },
       signers: [grantTokenAccount, grantAccount]
     }
