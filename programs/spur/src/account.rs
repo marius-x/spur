@@ -10,6 +10,8 @@ pub struct TreasuryAccount {
 
 #[account]
 pub struct GrantAccount {
+    pub sender_wallet: Pubkey,
+    pub recipient_wallet: Pubkey,
     pub pda: Pubkey,
     pub bump: u8,
     pub mint_address: Pubkey,
@@ -19,8 +21,6 @@ pub struct GrantAccount {
     pub duration_sec: u64,
     pub initial_cliff_sec: u64,
     pub vest_interval_sec: u64,
-    pub sender_wallet: Pubkey,
-    pub recipient_wallet: Pubkey,
     pub grant_token_account: Pubkey,
     pub last_unlock_ts: i64,
     pub amount_unlocked: u64,
