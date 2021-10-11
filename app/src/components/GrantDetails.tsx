@@ -6,87 +6,71 @@ import {
   Descriptions,
   PageHeader,
   Space,
-  Spin,
 } from 'antd';
-
-import { GrantAccount, useGrantAccount } from '../lib/program';
 import moment from 'moment';
+import { GrantAccount } from '../lib/client';
 
 interface props {
-  grantPk: PublicKey,
+  grant: GrantAccount,
   onRemove: (grantPk: PublicKey) => Promise<boolean>,
   onRevoke: (grantPk: PublicKey) => Promise<boolean>,
-  onUnlock: (grantPk: PublicKey, grant: GrantAccount) => Promise<boolean>
 }
 
 const GrantDetails: FC<props> = ({
-  grantPk,
+  grant,
   onRemove,
   onRevoke,
-  onUnlock
 }) => {
-  const grant = useGrantAccount(grantPk);
   const handleRemove = async () => {
-    const success = await onRemove(grantPk);
+    const success = await onRemove(grant.publicKey);
     if (success) {
       message.success("Grant successfully removed!");
     } else {
       message.error("Error removing grant!");
     }
   }
+
   const handleRevoke = async () => {
-    const success = await onRevoke(grantPk);
+    const success = await onRevoke(grant.publicKey);
     if (success) {
       message.success("Grant successfully revoked!");
     } else {
       message.error("Error revoking grant!");
     }
   }
-  const handleUnlock = async () => {
-    const success = await onUnlock(grantPk, grant!);
-    if (success) {
-      message.success("Grant successfully unlocked!");
-    } else {
-      message.error("Error unlocking grant!");
-    }
-  }
+
   return (
     <Space direction="vertical">
-      <PageHeader title="Grant Details" subTitle={grantPk.toString()} extra={[
-        <Button key="1" disabled={grant === null} onClick={handleRemove}>Remove</Button>,
-        <Button key="2" disabled={grant === null} onClick={handleRevoke}>Revoke</Button>,
-        <Button key="3" disabled={grant === null} onClick={handleUnlock} type="primary">Unlock</Button>
+      <PageHeader title="Grant" subTitle={grant.publicKey.toString()} extra={[
+        <Button key="1" onClick={handleRemove}>Remove</Button>,
+        <Button key="2" onClick={handleRevoke} type="primary">Revoke</Button>,
       ]} />
-      {
-        (grant == null) ? (<Spin />) : (
-          <Space direction="vertical">
-            <Descriptions bordered column={1}>
-              <Descriptions.Item label="Mint Address">{grant.mintAddress.toString()}</Descriptions.Item>
-              <Descriptions.Item label="Recipient Wallet">{grant.recipientWallet.toString()}</Descriptions.Item>
-              <Descriptions.Item label="Options">{grant.optionMarketKey ? "YES": "NO"}</Descriptions.Item>
-              <Descriptions.Item label="Amount">{grant.amountTotal.toString()}</Descriptions.Item>
-              <Descriptions.Item label="Issue Date">
-                {moment.unix(grant.issueTs.toNumber()).format("MM-YYYY")}
-              </Descriptions.Item>
-              <Descriptions.Item label="End Date">
-                {moment.unix(grant.issueTs.toNumber()).add(grant.durationSec.toNumber(), "seconds").format("MM-YYYY")}
-              </Descriptions.Item>
-              <Descriptions.Item label="Initial Cliff Date">
-                {grant.initialCliffSec.toNumber() ? moment.unix(grant.issueTs.toNumber()).add(grant.initialCliffSec.toNumber(), "seconds").format("MM-YYYY"): "none"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Vest Interval">
-                {grant.vestIntervalSec.toNumber() / 3600 / 24} {"days"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Vest Interval">
-                {grant.lastUnlockTs.toNumber() ? moment.unix(grant.lastUnlockTs.toNumber()).format("MM/DD/YYYY") : "none"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Amount Unlocked">
-                {grant.amountUnlocked.toNumber()}
-              </Descriptions.Item>
-            </Descriptions>
-          </Space>
-        )
-      }
+      <Space direction="vertical">
+        <Descriptions bordered column={1}>
+          <Descriptions.Item label="Recipient">{grant.account.recipientWallet.toString()}</Descriptions.Item>
+          <Descriptions.Item label="Mint">{grant.account.mintAddress.toString()}</Descriptions.Item>
+          <Descriptions.Item label="Amount">{grant.account.amountTotal.toString()}</Descriptions.Item>
+          <Descriptions.Item label="Options">{grant.account.optionMarketKey ? "Yes": "No"}</Descriptions.Item>
+          <Descriptions.Item label="Issue Date">
+            {moment.unix(grant.account.issueTs).format("MM-DD-YYYY")}
+          </Descriptions.Item>
+          <Descriptions.Item label="End Date">
+            {moment.unix(grant.account.issueTs).add(grant.account.durationSec, "seconds").format("MM-DD-YYYY")}
+          </Descriptions.Item>
+          <Descriptions.Item label="Initial Cliff">
+            {grant.account.initialCliffSec ? moment.unix(grant.account.issueTs).add(grant.account.initialCliffSec, "seconds").format("MM-DD-YYYY"): "none"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Vest Interval">
+            {grant.account.vestIntervalSec / 3600 / 24} {"days"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Last Unlock">
+            {grant.account.lastUnlockTs ? moment.unix(grant.account.lastUnlockTs).format("MM/DD/YYYY") : "N/A"}
+          </Descriptions.Item>
+          <Descriptions.Item label="Amount Unlocked">
+            {grant.account.amountUnlocked}
+          </Descriptions.Item>
+        </Descriptions>
+      </Space>
     </Space>
   );
 }

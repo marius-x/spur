@@ -13,6 +13,7 @@ import {
   DatePicker,
   Radio
 } from 'antd';
+import moment from 'moment';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -20,6 +21,7 @@ const { Option } = Select;
 const MangoMint = new PublicKey("7dXaobJ79k4GY6xNnfpXSeXiHcxE3tvVtE3GTwJ7BgTv");
 const SolMint = new PublicKey("77ZJLL97MSG8kFePoLp69YPYR2n9JXmajqwoNDAHfhLB");
 const UsdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+const CustomMint = new PublicKey("ZgDg4kcSHnVpfp7qhrpjsiZFFNtKNWtF1Y2DfoMUxgB");
 
 const TOKEN_LIBRARY = [
   {
@@ -46,12 +48,17 @@ export interface GrantCreateParams {
   recipient: string,
 }
 
+type FormValues = GrantCreateParams & {
+  numPeriods: number,
+  amountPerPeriod: number,
+}
+
 interface props {
   onCreate: (params: GrantCreateParams) => Promise<boolean>
 }
 
 const GrantCreate: FC<props> = ({ onCreate }) => {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<FormValues>();
   
   const handleSelectMintToken = (value: string) => {
     const token = TOKEN_LIBRARY.find(({ name }) => name === value);
@@ -86,8 +93,18 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
     }
   }
 
-  const handleSubmit = async (values: GrantCreateParams) => {
-    const success = await onCreate(values);
+  const handleSubmit = async (values: FormValues) => {
+    console.log("values r", values.duration[0]);
+    console.log("values p", values.duration[0].toDate());
+    const success = await onCreate({
+      amount: values.amount,
+      cliff: values.cliff?.clone() ?? null,
+      duration: [values.duration[0].clone(), values.duration[1].clone()],
+      issueOptions: values.issueOptions,
+      mintAddress: values.mintAddress,
+      period: values.period,
+      recipient: values.recipient,
+    });
     if (success) {
       message.success("Successfully created new grant!");
     } else {
@@ -114,6 +131,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           label="Recipient"
           name="recipient"
           rules={[{ required: true, message: 'Please input recipient!' }]}
+          initialValue="JDgFLjT4fAYbPG9ucoQn6RZ2Shd42ybJCxp9hSbxWeqd"
         >
           <Input placeholder="Enter wallet address" />
         </Form.Item>
@@ -134,7 +152,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           wrapperCol={{ span: 16, offset: 6 }}
           label=""
           name="mintAddress"
-          initialValue={MangoMint.toString()}
+          initialValue={CustomMint.toString()}
           rules={[{ required: true, message: 'Please input mint address!' }]}
         >
           <Input placeholder="Enter SPL mint token address" />
@@ -144,7 +162,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           label="Options"
           name="issueOptions"
           valuePropName="checked"
-          initialValue={false}
+          initialValue={true}
           tooltip="Issue token options instead of tokens. Issuing options might have better tax benefits"
         >
           <Switch />
@@ -154,6 +172,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           label="Amount"
           name="amount"
           rules={[{ required: true, message: 'Please input amount!' }]}
+          initialValue={100}
         >
           <InputNumber onChange={updateAmountPerPeriod} />
         </Form.Item>
@@ -162,6 +181,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           label="Duration"
           name="duration"
           rules={[{ required: true, message: 'Please select grant duration!' }]}
+          initialValue={[moment("11/01/2021", "MM/DD/YYYY"), moment("01/01/2022", "MM/DD/YYYY")]}
         >
           <RangePicker picker="month" onChange={updateAmountPerPeriod} />
         </Form.Item>
@@ -169,6 +189,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
         <Form.Item
           label="Initial Cliff"
           name="cliff"
+          initialValue={moment("12/01/2021", "MM/DD/YYYY")}
         >
           <DatePicker />
         </Form.Item>
@@ -176,7 +197,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
         <Form.Item
           label="Vest Period"
           name="period"
-          initialValue="month"
+          initialValue="week"
         >
           <Radio.Group onChange={updateAmountPerPeriod}>
             <Radio.Button value="day">Day</Radio.Button>

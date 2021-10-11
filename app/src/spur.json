@@ -29,17 +29,54 @@
       ]
     },
     {
+      "name": "addGrantToTreasury",
+      "accounts": [
+        {
+          "name": "treasuryAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "grantAccount",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "grantAccount",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "removeGrantFromTreasury",
+      "accounts": [
+        {
+          "name": "treasuryAccount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "grantAccount",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
       "name": "initGrant",
       "accounts": [
+        {
+          "name": "pda",
+          "isMut": true,
+          "isSigner": false
+        },
         {
           "name": "grantAccount",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "grantPda",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "grantTokenAccount",
@@ -47,17 +84,12 @@
           "isSigner": true
         },
         {
-          "name": "recipientTokenAccount",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "senderWallet",
           "isMut": true,
           "isSigner": true
         },
         {
-          "name": "recipientWallet",
+          "name": "senderTokenAccount",
           "isMut": true,
           "isSigner": false
         },
@@ -73,11 +105,6 @@
         },
         {
           "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "associatedTokenProgram",
           "isMut": false,
           "isSigner": false
         },
@@ -119,51 +146,46 @@
           "type": "u64"
         },
         {
-          "name": "senderWallet",
-          "type": "publicKey"
-        },
-        {
           "name": "recipientWallet",
           "type": "publicKey"
         }
       ]
     },
     {
-      "name": "addGrantToTreasury",
+      "name": "revokeGrant",
       "accounts": [
         {
-          "name": "treasuryAccount",
+          "name": "senderWallet",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "pda",
           "isMut": true,
           "isSigner": false
         },
         {
           "name": "grantAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "grantTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "senderTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
       ],
-      "args": [
-        {
-          "name": "grantAccount",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "removeGrantFromTreasury",
-      "accounts": [
-        {
-          "name": "treasuryAccount",
-          "isMut": true,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "grantAccount",
-          "type": "publicKey"
-        }
-      ]
+      "args": []
     },
     {
       "name": "unlockGrant",
@@ -179,12 +201,17 @@
           "isSigner": false
         },
         {
+          "name": "recipientWallet",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "recipientTokenAccount",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "pdaAccount",
+          "name": "pda",
           "isMut": false,
           "isSigner": false
         },
@@ -240,6 +267,22 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "senderWallet",
+            "type": "publicKey"
+          },
+          {
+            "name": "recipientWallet",
+            "type": "publicKey"
+          },
+          {
+            "name": "pda",
+            "type": "publicKey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
             "name": "mintAddress",
             "type": "publicKey"
           },
@@ -270,18 +313,6 @@
             "type": "u64"
           },
           {
-            "name": "senderWallet",
-            "type": "publicKey"
-          },
-          {
-            "name": "recipientWallet",
-            "type": "publicKey"
-          },
-          {
-            "name": "recipientTokenAccount",
-            "type": "publicKey"
-          },
-          {
             "name": "grantTokenAccount",
             "type": "publicKey"
           },
@@ -296,20 +327,12 @@
           {
             "name": "revoked",
             "type": "bool"
-          },
-          {
-            "name": "pda",
-            "type": "publicKey"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
           }
         ]
       }
     }
   ],
   "metadata": {
-    "address": "H4tVcJrkbYgMvVQNHeLcicDqVnaHHrmUUpyVHvhN3MDh"
+    "address": "BuyzX13Nh4XnV2U3M7krdKF8m39agkeedUD6veMMJim7"
   }
 }

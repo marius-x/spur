@@ -11,7 +11,7 @@ use context::*;
 mod account;
 mod context;
 
-declare_id!("2Tz77YyGmRYXgSeNmPhcQBFoapAgfRTixz7fm5Uk8BXF");
+declare_id!("BuyzX13Nh4XnV2U3M7krdKF8m39agkeedUD6veMMJim7");
 
 #[program]
 pub mod spur {

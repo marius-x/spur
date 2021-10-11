@@ -1,11 +1,11 @@
-[programs.localnet]
-spur = "2Tz77YyGmRYXgSeNmPhcQBFoapAgfRTixz7fm5Uk8BXF"
+[programs.devnet]
+spur = "BuyzX13Nh4XnV2U3M7krdKF8m39agkeedUD6veMMJim7"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "/Users/marius/.config/solana/id.json"
 
 [scripts]
