@@ -216,9 +216,9 @@ async function initOptionsMarket(
     console.log("initializeMarket..")
     const resp = await instructions.initializeMarket(psyProgram, {
       expirationUnixTimestamp: new anchor.BN(expirationTs),
-      quoteAmountPerContract: new anchor.BN(1),
+      quoteAmountPerContract,
       quoteMint,
-      underlyingAmountPerContract: new anchor.BN(1),
+      underlyingAmountPerContract,
       underlyingMint,
     });
     console.log("initializeMarket", resp);
@@ -234,9 +234,7 @@ async function mintOptions(
   amountTotal: number,
   issueMoment: moment.Moment,
 ): Promise<mintOptionsResponse> {
-  console.log("issueMoment", issueMoment.toLocaleString());
   const expirationTs = issueMoment.clone().startOf("month").add(10, "years").unix();
-  console.log("expirationTs", expirationTs);
   const ixs: TransactionInstruction[] = [];
 
   const market = await initOptionsMarket(psyProgram, expirationTs, WrappedSol, mintAddress);
@@ -274,12 +272,11 @@ async function mintOptions(
     wallet.publicKey!
   );
 
-  // const ixs1 = await getOrAddAssociatedTokenAccountTx(
-  //   optionTokenAccountPk, market.optionMint, psyProgram.provider, wallet.publicKey!);
-
-  // if (ixs1) {
-  //   ixs.push(ixs1);
-  // }
+  const ix1 = await getOrAddAssociatedTokenAccountTx(
+    optionTokenAccountPk, market.optionMint, psyProgram.provider, wallet.publicKey!);
+  if (ix1) {
+    ixs.push(ix1);
+  }
 
   const writerTokenAccountPk = await Token.getAssociatedTokenAddress(
     SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
@@ -288,12 +285,11 @@ async function mintOptions(
     wallet.publicKey!
   );
 
-  // const ixs2 = await getOrAddAssociatedTokenAccountTx(
-  //   writerTokenAccountPk, market.writerTokenMint, psyProgram.provider, wallet.publicKey!);
-  
-  // if (ixs2) {
-  //   ixs.push(ixs2);
-  // }
+  const ix2 = await getOrAddAssociatedTokenAccountTx(
+    writerTokenAccountPk, market.writerTokenMint, psyProgram.provider, wallet.publicKey!);
+  if (ix2) {
+    ixs.push(ix2);
+  }
 
   const underlyingTokenAccountPk = await Token.getAssociatedTokenAddress(
     SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
@@ -328,6 +324,9 @@ async function mintOptions(
     new anchor.BN(1),
     market
   );
+  if (ix) {
+    ixs.push(ix);
+  }
 
   // remainingAccounts.push({
   //   pubkey: optionTokenAccountPk,
@@ -341,10 +340,6 @@ async function mintOptions(
   // });
 
   console.log("ix", ix, "signers", signers);
-
-  if (ix) {
-    ixs.push(ix);
-  }
 
   return {
     ixs,
