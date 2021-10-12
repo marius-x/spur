@@ -120,12 +120,15 @@ export class Client {
     grantAccountPk: PublicKey,
     grantTokenAccountPk: PublicKey,
     recipientTokenAccountPk: PublicKey,
-    recipientWallet: anchor.web3.Signer,
+    recipientWallet: PublicKey,
+    instructions: anchor.web3.TransactionInstruction[],
+    signers: anchor.web3.Signer[]
   ): Promise<void> {
     const [pda, ] = await this.getPda();
     await this.program.rpc.unlockGrant({
+      instructions: instructions.length ? instructions : undefined,
       accounts: {
-        recipientWallet: recipientWallet.publicKey,
+        recipientWallet: recipientWallet,
         pda: pda,
         grantAccount: grantAccountPk,
         grantTokenAccount: grantTokenAccountPk,
@@ -134,7 +137,7 @@ export class Client {
         tokenProgram: TOKEN_PROGRAM_ID,
         clock: SYSVAR_CLOCK_PUBKEY,
       },
-      signers: [recipientWallet],
+      signers: signers.length ? signers : undefined
     });
   }
   async getPda(): Promise<[PublicKey, number]> {
@@ -164,11 +167,34 @@ export class Client {
     }));
   }
   async findGrantsByRecipient(recipientWalletPk: PublicKey): Promise<GrantAccount[]> {
-    return await this.program.account.grantAccount.all([{
+    const accounts = await this.program.account.grantAccount.all([{
       memcmp: {
         offset: 40,
         bytes: recipientWalletPk.toBase58(),
       },
     }]);
+    return accounts.map(Client.toGrantAccount);
+  }
+  static toGrantAccount(a: any): GrantAccount {
+    return {
+      publicKey: new PublicKey(a.publicKey.toString()),
+      account: {
+        pda: new PublicKey(a.account.pda.toString()),
+        bump: a.account.bump,
+        mintAddress: new PublicKey(a.account.mintAddress.toString()),
+        optionMarketKey: a.account.optionMarketKey ? new PublicKey(a.account.optionMarketKey.toString()) : null,
+        amountTotal: a.account.amountTotal.toNumber(),
+        issueTs: a.account.issueTs.toNumber(),
+        durationSec: a.account.durationSec.toNumber(),
+        initialCliffSec: a.account.initialCliffSec.toNumber(),
+        vestIntervalSec: a.account.vestIntervalSec.toNumber(),
+        senderWallet: new PublicKey(a.account.senderWallet.toString()),
+        recipientWallet: new PublicKey(a.account.recipientWallet.toString()),
+        grantTokenAccount: new PublicKey(a.account.grantTokenAccount.toString()),
+        amountUnlocked: a.account.amountUnlocked.toNumber(),
+        lastUnlockTs: a.account.lastUnlockTs.toNumber(),
+        revoked: a.account.revoked,
+      }
+    };
   }
 };

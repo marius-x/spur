@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AccountMeta, Connection, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { AccountMeta, Connection, PublicKey, SYSVAR_CLOCK_PUBKEY, Transaction } from "@solana/web3.js";
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { clusterApiUrl, ConfirmOptions, TransactionInstruction } from '@solana/web3.js';
 import { Idl, Program, Provider, web3 } from '@project-serum/anchor';
@@ -7,7 +7,7 @@ import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { Token, TOKEN_PROGRAM_ID, AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import BN from "bn.js";
 import useProgram from "../hooks/spurProgram";
-import { Client } from './client';
+import { Client, GrantAccount } from './client';
 import { deriveOptionKeyFromParams, feeAmountPerContract, getOptionByKey, getOrAddAssociatedTokenAccountTx, instructions, OptionMarketWithKey, ProgramVersions, PsyAmericanIdl, PSY_AMERICAN_PROGRAM_IDS } from "@mithraic-labs/psy-american"
 import * as anchor from '@project-serum/anchor';
 
@@ -25,22 +25,22 @@ export interface TreasuryAccount {
   grantAccounts: BN[]
 }
 
-export interface GrantAccount {
-  mintAddress: BN,
-  optionMarketKey: BN,
-  amountTotal: BN,
-  issueTs: BN,
-  durationSec: BN,
-  initialCliffSec: BN,
-  vestIntervalSec: BN,
-  senderWallet: BN,
-  recipientWallet: BN,
-  grantTokenAccount: BN,
-  lastUnlockTs: BN,
-  amountUnlocked: BN,
-  revoked: boolean,
-  pda: BN
-}
+// export interface GrantAccount {
+//   mintAddress: BN,
+//   optionMarketKey: BN,
+//   amountTotal: BN,
+//   issueTs: BN,
+//   durationSec: BN,
+//   initialCliffSec: BN,
+//   vestIntervalSec: BN,
+//   senderWallet: BN,
+//   recipientWallet: BN,
+//   grantTokenAccount: BN,
+//   lastUnlockTs: BN,
+//   amountUnlocked: BN,
+//   revoked: boolean,
+//   pda: BN
+// }
 
 export interface Accounts {
   treasury?: TreasuryAccount
@@ -385,40 +385,115 @@ export async function revokeGrant(
 }
 
 export async function unlockGrant(
-  provider: Provider, 
-  program: Program, 
+  psyProgram: Program,
+  client: Client,
+  provider: Provider,
   wallet: WalletContextState,
-  treasuryAccount: PublicKey,
-  grantPk: PublicKey,
   grant: GrantAccount
 ) {
+  const ixs: TransactionInstruction[] = [];
   const destTokenAccountPk = await Token.getAssociatedTokenAddress(
     SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    new PublicKey(grant.recipientWallet.toString()),
+    grant.account.mintAddress,
     wallet.publicKey!
   );
-  const accounts = {
-    grantAccount: grantPk,
-    grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
-    destTokenAccount: destTokenAccountPk,
-    pdaAccount: new PublicKey(grant.pda.toString()),
-    systemProgram: SystemProgram.programId,
-    tokenProgram: TOKEN_PROGRAM_ID,
-    clock: SYSVAR_CLOCK_PUBKEY,
-  };
-  console.log("accounts", accounts);
-  await program.rpc.unlockGrant(
-    {
-      accounts: {
-        grantAccount: grantPk,
-        grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
-        destTokenAccount: destTokenAccountPk,
-        pdaAccount: new PublicKey(grant.pda.toString()),
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        clock: SYSVAR_CLOCK_PUBKEY,
-      }
-    }
+  const ix = await getOrAddAssociatedTokenAccountTx(
+    destTokenAccountPk, grant.account.mintAddress, provider, wallet.publicKey!);
+  if (ix) {
+    ixs.push(ix);
+  }
+  await client.unlockGrant(
+    grant.publicKey,
+    grant.account.grantTokenAccount,
+    destTokenAccountPk,
+    wallet.publicKey!,
+    ixs,
+    []
   );
+  if (!grant.account.optionMarketKey) {
+    return;
+  }
+  // const destTokenAccountPk = await Token.getAssociatedTokenAddress(
+  //   SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+  //   TOKEN_PROGRAM_ID,
+  //   new PublicKey(grant.recipientWallet.toString()),
+  //   wallet.publicKey!
+  // );
+  // const accounts = {
+  //   grantAccount: grantPk,
+  //   grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
+  //   destTokenAccount: destTokenAccountPk,
+  //   pdaAccount: new PublicKey(grant.pda.toString()),
+  //   systemProgram: SystemProgram.programId,
+  //   tokenProgram: TOKEN_PROGRAM_ID,
+  //   clock: SYSVAR_CLOCK_PUBKEY,
+  // };
+  // console.log("accounts", accounts);
+  // await program.rpc.unlockGrant(
+  //   {
+  //     accounts: {
+  //       grantAccount: grantPk,
+  //       grantTokenAccount: new PublicKey(grant.grantTokenAccount.toString()),
+  //       destTokenAccount: destTokenAccountPk,
+  //       pdaAccount: new PublicKey(grant.pda.toString()),
+  //       systemProgram: SystemProgram.programId,
+  //       tokenProgram: TOKEN_PROGRAM_ID,
+  //       clock: SYSVAR_CLOCK_PUBKEY,
+  //     }
+  //   }
+  // );
+}
+
+export async function exercise(
+  psyProgram: Program,
+  provider: Provider,
+  wallet: WalletContextState,
+  grant: GrantAccount,
+  amount: number) {
+  const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    grant.account.mintAddress,
+    wallet.publicKey!
+  );
+
+  if (grant.account.optionMarketKey) {
+    let market = await getOptionByKey(psyProgram, grant.account.optionMarketKey);
+    if (!market) {
+      return;
+    }
+    const destTokenAccountPk = await Token.getAssociatedTokenAddress(
+      SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      market.underlyingAssetMint,
+      wallet.publicKey!
+    );
+    const quoteTokenAccountPk = await Token.getAssociatedTokenAddress(
+      SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      market.quoteAssetMint,
+      wallet.publicKey!
+    );
+    //const ixs: TransactionInstruction[] = [];
+    const ix1 = await getOrAddAssociatedTokenAccountTx(
+      quoteTokenAccountPk, market.optionMint, psyProgram.provider, wallet.publicKey!);
+    const tx = new Transaction()
+    if (ix1) {
+      tx.add(ix1);
+    }
+    // const mint = new Token(provider.connection, market.optionMint, TOKEN_PROGRAM_ID, )
+    const ix2 = await instructions.exerciseOptionsInstruction(
+      psyProgram,
+      new anchor.BN(amount),
+      market,
+      srcTokenAccountPk,
+      destTokenAccountPk,
+      quoteTokenAccountPk
+    );
+    if (ix2) {
+      tx.add(ix2);
+    }
+    const res = await provider.send(tx);
+  }
 }
