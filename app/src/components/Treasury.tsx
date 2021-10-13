@@ -117,7 +117,8 @@ const Treasury: FC = () => {
           {
             (page === Page.Create) ? (<GrantCreate onCreate={handleCreateGrant} />) : 
             (page === Page.Details && selectedGrant) ? (
-              <GrantDetails 
+              <GrantDetails
+                psyProgram={psyProgram!}
                 grant={selectedGrant}
                 onRemove={handleRemoveGrant}
                 onRevoke={handleRevokeGrant}
