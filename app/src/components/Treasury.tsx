@@ -1,33 +1,18 @@
-import React, { FC, useEffect, useMemo, useState } from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import {
   Button, 
   Card,
-  Divider,
   Empty,
   Space,
-  Typography
 } from 'antd';
-import { Loader, PublicKey } from '@solana/web3.js';
-
-import { web3 } from '@project-serum/anchor';
-import { 
-  initTreasury, 
-  initGrant, 
-  useAccounts, 
-  //useProgram, 
-  //useProvider, 
-  useTreasuryAccountPk, 
-  removeGrantFromTreasury,
-  unlockGrant} from '../lib/program';
-import BN from "bn.js";
+import { PublicKey } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { initGrant, revokeGrant} from '../lib/program';
 import GrantCreate, { GrantCreateParams } from './GrantCreate';
 import GrantDetails from './GrantDetails';
-import { createPsy } from '../lib/psy';
-import { useEndpointUrl, useProvider } from '../hooks/network';
-
+import { useProvider } from '../hooks/network';
 import { shortSha } from '../util/text';
 import useClient from '../hooks/spurClient';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { unitOfTimeToSec } from '../util/time';
 import usePsyProgram from '../hooks/psyProgram';
 import { GrantAccount } from '../lib/client';
@@ -45,21 +30,16 @@ const Treasury: FC = () => {
   const psyProgram = usePsyProgram();
   const [page, setPage] = useState<Page>(Page.Empty);
   const [selectedGrant, setSelectedGrant] = useState<Nullable<GrantAccount>>(null);
-  
   const [grants, setGrants] = useState<GrantAccount[]>([]);
-  const [loadingGrants, setLoadingGrants] = useState(false);
 
   useEffect(() => {
-    setLoadingGrants(true);
     const setAsync = async () => {
       if (!client || !wallet?.publicKey) {
         setGrants([]);
-        setLoadingGrants(false);
         return;
       }
       const grantsFound = await client.findGrantsBySender(wallet.publicKey);
       setGrants(grantsFound);
-      setLoadingGrants(false);
     };
     setAsync();
   }, [client, wallet]);
@@ -71,7 +51,6 @@ const Treasury: FC = () => {
 
   const handleCreateGrant = async (create: GrantCreateParams): Promise<boolean> => {
     try {
-      console.log("handleCreateGrant", create.duration[0].toLocaleString());
       await initGrant(
         psyProgram!,
         provider!, 
@@ -92,63 +71,20 @@ const Treasury: FC = () => {
     }
   }
 
-  const handleRemoveGrant = async (grantPk: PublicKey): Promise<boolean> => {
-    return false;
+  const handleRemoveGrant = async (grant: GrantAccount): Promise<boolean> => {
+    
+    return false
   }
-  //   if (!provider || !program || !treasuryPk) {
-  //     console.log('Cannot remove grant!');
-  //     return false;
-  //   }
-  //   try {
-  //     await removeGrantFromTreasury(provider, program, wallet, treasuryPk, grantPk);
-  //     return true;
-  //   } catch (err) {
-  //     console.log(err);
-  //     return false;
-  //   }
-  // }
 
-  const handleRevokeGrant = async (grantPk: PublicKey): Promise<boolean> => {
-    return false;
+  const handleRevokeGrant = async (grant: GrantAccount): Promise<boolean> => {
+    try {
+      await revokeGrant(client!, grant, wallet);
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
   }
-  //   if (!provider || !program || !treasuryPk) {
-  //     console.log('Cannot revoke grant!');
-  //     return false;
-  //   }
-  //   try {
-  //     await removeGrantFromTreasury(provider, program, wallet, treasuryPk, grantPk);
-  //     return true;
-  //   } catch (err) {
-  //     console.log(err);
-  //     return false;
-  //   }
-  // }
-
-  // const handleUnlockGrant = async (grantPk: PublicKey, grant: GrantAccount): Promise<boolean> => {
-  //   if (!provider || !program || !treasuryPk) {
-  //     console.log('Cannot unlock grant!');
-  //     return false;
-  //   }
-  //   try {
-  //     await unlockGrant(provider, program, wallet, treasuryPk, grantPk, grant);
-  //     return true;
-  //   } catch (err) {
-  //     console.log(err);
-  //     return false;
-  //   }
-  // }
-
-  // const handleCreateMarket = async () => {
-  //   if (!program || !provider) {
-  //     return;
-  //   }
-  //   await createPsy(provider);
-  // }
-
-  // if (!accounts?.treasury) {
-  //   return <Button onClick={handleCreateMarket}>Create Psy</Button>;
-  //   //return <EmptyState onCreateTreasury={handleCreateTreasury} />;
-  // }
 
   return (
     <div>

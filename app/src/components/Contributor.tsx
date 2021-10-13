@@ -1,21 +1,17 @@
-import React, { FC, useEffect, useState } from 'react';
-import {
-  Button, 
-  Card,
-  Divider,
-  Empty,
-  Space,
-  Typography
-} from 'antd';
-import { PublicKey } from '@solana/web3.js';
-import { GrantAccount } from '../lib/client';
-import { useProvider } from '../hooks/network';
 import { useWallet } from '@solana/wallet-adapter-react';
+import {
+  Button,
+  Card, Empty,
+  Space
+} from 'antd';
+import React, { FC, useEffect, useState } from 'react';
+import { useProvider } from '../hooks/network';
 import usePsyProgram from '../hooks/psyProgram';
-import { shortSha } from '../util/text';
 import useClient from '../hooks/spurClient';
-import ContGrantDetails from './ContGrantDetails';
+import { GrantAccount } from '../lib/client';
 import { exercise, unlockGrant } from '../lib/program';
+import { shortSha } from '../util/text';
+import ContGrantDetails from './ContGrantDetails';
 
 enum Page {
   Empty,

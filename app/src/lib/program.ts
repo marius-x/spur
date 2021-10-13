@@ -1,125 +1,15 @@
-import { useEffect, useState } from 'react';
-import { AccountMeta, Connection, PublicKey, SYSVAR_CLOCK_PUBKEY, Transaction } from "@solana/web3.js";
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { clusterApiUrl, ConfirmOptions, TransactionInstruction } from '@solana/web3.js';
-import { Idl, Program, Provider, web3 } from '@project-serum/anchor';
-import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
-import { Token, TOKEN_PROGRAM_ID, AccountLayout, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import BN from "bn.js";
-import useProgram from "../hooks/spurProgram";
-import { Client, GrantAccount } from './client';
-import { deriveOptionKeyFromParams, feeAmountPerContract, getOptionByKey, getOrAddAssociatedTokenAccountTx, instructions, OptionMarketWithKey, ProgramVersions, PsyAmericanIdl, PSY_AMERICAN_PROGRAM_IDS } from "@mithraic-labs/psy-american"
+import { deriveOptionKeyFromParams, feeAmountPerContract, getOptionByKey, getOrAddAssociatedTokenAccountTx, instructions, OptionMarketWithKey } from "@mithraic-labs/psy-american";
 import * as anchor from '@project-serum/anchor';
-
-const { SystemProgram, Keypair, SYSVAR_RENT_PUBKEY } = web3;
+import { Program, Provider } from '@project-serum/anchor';
+import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { WalletContextState } from '@solana/wallet-adapter-react';
+import { PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Client, GrantAccount } from './client';
 
 
 const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey(
   'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
 );
-
-const TREASURY_PDA_SEED = "treasury";
-
-export interface TreasuryAccount {
-  initialized: boolean,
-  grantAccounts: BN[]
-}
-
-// export interface GrantAccount {
-//   mintAddress: BN,
-//   optionMarketKey: BN,
-//   amountTotal: BN,
-//   issueTs: BN,
-//   durationSec: BN,
-//   initialCliffSec: BN,
-//   vestIntervalSec: BN,
-//   senderWallet: BN,
-//   recipientWallet: BN,
-//   grantTokenAccount: BN,
-//   lastUnlockTs: BN,
-//   amountUnlocked: BN,
-//   revoked: boolean,
-//   pda: BN
-// }
-
-export interface Accounts {
-  treasury?: TreasuryAccount
-}
-
-export function useTreasuryAccountPk() {
-  const [treasuryAccountPk, setTreasuryAccountPk] = useState<Nullable<PublicKey>>(null);
-  const wallet = useWallet();
-  const program = useProgram();
-
-  useEffect(() => {
-    const setAsync = async () => {
-      if (!wallet || !wallet.publicKey || !program) {
-        return;
-      }
-      const [pk] = await PublicKey.findProgramAddress(
-        [wallet.publicKey.toBuffer(), Buffer.from(TREASURY_PDA_SEED)],
-        program.programId
-      );
-      setTreasuryAccountPk(pk);
-    }
-    setAsync();
-  }, [wallet, program])
-
-  return treasuryAccountPk;
-}
-
-export function useAccounts() {
-  const [accounts, setAccounts] = useState<Nullable<Accounts>>(null);
-  const program = useProgram();
-  const wallet = useWallet();
-  const treasuryPk = useTreasuryAccountPk();
-
-  useEffect(() => {
-    const setAsync = async () => {
-      if (!program || !wallet.connected || !wallet.publicKey || !treasuryPk) {
-        setAccounts(null);
-        return;
-      }
-      try {
-        const treasury = await program.account.treasuryAccount.fetch(treasuryPk) as TreasuryAccount;
-        setAccounts({ treasury });
-        console.log(`treasury: ${JSON.stringify(treasury)}`);
-      } catch (err) {
-        if (!isErrAccountNotExist(err as Error)) {
-          console.log(`Error initializing accounts: ${err}`); 
-        }
-        setAccounts(null);
-      }
-    }
-    setAsync();
-  }, [wallet, program, treasuryPk]);
-
-  return accounts;
-}
-
-function isErrAccountNotExist(err: Error): boolean {
-  return err && err.message.includes("Account does not exist");
-}
-
-export async function initTreasury(
-  program: Program, 
-  wallet: WalletContextState,
-) {
-  if (!wallet.publicKey) {
-    throw new Error("Empty wallet publicKey");
-  }
-  const [treasuryPk, bump] = await PublicKey.findProgramAddress(
-    [wallet.publicKey.toBuffer(), Buffer.from(TREASURY_PDA_SEED)],
-    program.programId
-  );
-  await program.rpc.initTreasury(bump, {
-    accounts: {
-      treasuryAccount: treasuryPk,
-      authorityWallet: wallet.publicKey,
-      systemProgram: SystemProgram.programId,
-    }
-  });
-}
 
 export async function initGrant(
   psyProgram: Program,
@@ -349,39 +239,23 @@ async function mintOptions(
   };
 }
 
-export async function removeGrantFromTreasury(
-  provider: Provider, 
-  program: Program, 
-  wallet: WalletContextState,
-  treasuryAccount: PublicKey,
-  grantAccount: PublicKey 
-) {
-  await program.rpc.removeGrantFromTreasury(
-    grantAccount, 
-    {
-      accounts: {
-        treasuryAccount
-      }
-    }
-  );
-}
-
 export async function revokeGrant(
-  provider: Provider, 
-  program: Program, 
-  wallet: WalletContextState,
-  treasuryAccount: PublicKey,
-  grantAccount: PublicKey 
+  client: Client, 
+  grant: GrantAccount, 
+  wallet: WalletContextState
 ) {
-  console.log("revoke not impl!");
-  // await program.rpc.removeGrantFromTreasury(
-  //   grantAccount, 
-  //   {
-  //     accounts: {
-  //       treasuryAccount
-  //     }
-  //   }
-  // );
+  const senderTokenAccountPk = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    grant.account.mintAddress,
+    wallet.publicKey!
+  );
+  await client.revokeGrant(
+    grant.publicKey,
+    grant.account.grantTokenAccount,
+    senderTokenAccountPk,
+    wallet.publicKey!,
+    []);
 }
 
 export async function unlockGrant(

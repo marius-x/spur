@@ -101,19 +101,20 @@ export class Client {
     grantAccountPk: PublicKey,
     grantTokenAccountPk: PublicKey,
     senderTokenAccountPk: PublicKey,
-    senderWallet: anchor.web3.Signer,
+    senderWallet: PublicKey,
+    signers: anchor.web3.Signer[]
   ): Promise<void> {
     const [pda, ] = await this.getPda();
     await this.program.rpc.revokeGrant({
       accounts: {
-        senderWallet: senderWallet.publicKey,
+        senderWallet: senderWallet,
         pda: pda,
         grantAccount: grantAccountPk,
         grantTokenAccount: grantTokenAccountPk,
         senderTokenAccount: senderTokenAccountPk,
         tokenProgram: TOKEN_PROGRAM_ID,
       },
-      signers: [senderWallet],
+      signers: signers.length ? signers : undefined,
     });
   }
   async unlockGrant(

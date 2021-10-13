@@ -1,5 +1,5 @@
 import React, { FC } from 'react';
-import { PublicKey } from '@solana/web3.js';
+import moment from 'moment';
 import {
   message,
   Button, 
@@ -7,13 +7,12 @@ import {
   PageHeader,
   Space,
 } from 'antd';
-import moment from 'moment';
 import { GrantAccount } from '../lib/client';
 
 interface props {
   grant: GrantAccount,
-  onRemove: (grantPk: PublicKey) => Promise<boolean>,
-  onRevoke: (grantPk: PublicKey) => Promise<boolean>,
+  onRemove: (grant: GrantAccount) => Promise<boolean>,
+  onRevoke: (grant: GrantAccount) => Promise<boolean>,
 }
 
 const GrantDetails: FC<props> = ({
@@ -22,29 +21,32 @@ const GrantDetails: FC<props> = ({
   onRevoke,
 }) => {
   const handleRemove = async () => {
-    const success = await onRemove(grant.publicKey);
+    const success = await onRemove(grant);
     if (success) {
       message.success("Grant successfully removed!");
     } else {
       message.error("Error removing grant!");
     }
   }
-
   const handleRevoke = async () => {
-    const success = await onRevoke(grant.publicKey);
+    const success = await onRevoke(grant);
     if (success) {
       message.success("Grant successfully revoked!");
     } else {
       message.error("Error revoking grant!");
     }
   }
+  const canRemove = grant.account.revoked;
+  const actionHandler = canRemove ? handleRemove : handleRevoke;
+  const action = canRemove ? "Remove" : "Revoke"
 
   return (
     <Space direction="vertical">
-      <PageHeader title="Grant" subTitle={grant.publicKey.toString()} extra={[
-        <Button key="1" onClick={handleRemove}>Remove</Button>,
-        <Button key="2" onClick={handleRevoke} type="primary">Revoke</Button>,
-      ]} />
+      <PageHeader
+        title="Grant"
+        subTitle={grant.publicKey.toString()}
+        extra={[<Button key="1" onClick={actionHandler} type="primary">{action}</Button>]}
+      />
       <Space direction="vertical">
         <Descriptions bordered column={1}>
           <Descriptions.Item label="Recipient">{grant.account.recipientWallet.toString()}</Descriptions.Item>
@@ -68,6 +70,9 @@ const GrantDetails: FC<props> = ({
           </Descriptions.Item>
           <Descriptions.Item label="Amount Unlocked">
             {grant.account.amountUnlocked}
+          </Descriptions.Item>
+          <Descriptions.Item label="Revoked">
+            {grant.account.revoked ? "Yes" : "No"}
           </Descriptions.Item>
         </Descriptions>
       </Space>
