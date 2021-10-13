@@ -60,13 +60,16 @@ const Contributor: FC = () => {
   }
 
   const handleExerciseGrant = async (): Promise<boolean> => {
+    if (!selectedGrant || !selectedGrant.account.optionMarketKey) {
+      return false;
+    }
     try {
+
       await exercise(
         psyProgram!,
         provider!,
         wallet,
-        selectedGrant!,
-        10);
+        selectedGrant!);
       return true;
     } catch (err) {
       console.error(err);

@@ -3,7 +3,7 @@ import * as anchor from '@project-serum/anchor';
 import { Program, Provider } from '@project-serum/anchor';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { WalletContextState } from '@solana/wallet-adapter-react';
-import { PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { Client, GrantAccount } from './client';
 
 
@@ -13,7 +13,6 @@ const SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey(
 
 export async function initGrant(
   psyProgram: Program,
-  provider: Provider, 
   client: Client, 
   wallet: WalletContextState, 
   mintAddress: PublicKey,
@@ -31,12 +30,14 @@ export async function initGrant(
   let optMarketKey: Nullable<PublicKey> = null;
 
   if (issueOptions) {
+    const decimals = await getDecimals(psyProgram.provider.connection, mintAddress);
     const optResp = await mintOptions(
-      psyProgram, wallet, mintAddress, amountTotal, issueMoment);
+      psyProgram, wallet, mintAddress, decimals, amountTotal, issueMoment);
     effectiveMintAddress = optResp.mintAddress;
     optIxs = optResp.ixs;
     optMarketKey = optResp.marketKey;
     optSigners = optResp.signers;
+    amountTotal = decimals ? Math.trunc(amountTotal / decimals) : amountTotal;
   }
 
   const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
@@ -75,23 +76,31 @@ interface mintOptionsResponse {
 const WrappedSol = new PublicKey("So11111111111111111111111111111111111111112");
 
 const quoteAmountPerContract = new anchor.BN(1);
-const underlyingAmountPerContract = new anchor.BN(1);
+//const underlyingAmountPerContract = new anchor.BN(1);
 
-interface optMarketInfo {
-  optionMarketKey: PublicKey;
-  optionMintKey: PublicKey;
-  writerMintKey: PublicKey;
+async function getDecimals(connection: Connection, mint: PublicKey) {
+  const mintToken = new Token(connection, mint, TOKEN_PROGRAM_ID, new Keypair());
+  const mintInfo = await mintToken.getMintInfo();
+  return mintInfo.decimals;
 }
 
+// Fixed strike price 1Lamport per 1 token.
 async function initOptionsMarket(
   psyProgram: Program,
   expirationTs: number,
   quoteMint: PublicKey,
   underlyingMint: PublicKey,
+  underlyingAmount: number,
 ): Promise<Nullable<OptionMarketWithKey>> {
+  const underlyingAmountPerContract = new anchor.BN(underlyingAmount);
   console.log("deriveOptionKeyFromParams..", 
-    "programId", psyProgram.programId.toString(), "expTs", expirationTs, "quoteMint", quoteMint.toString(), "underMint", underlyingMint.toString(),
-    "quoteAmountPerContract", quoteAmountPerContract.toString(), "underlyingAmountPerContract", underlyingAmountPerContract.toString());
+    "programId", psyProgram.programId.toString(), 
+    "expTs", expirationTs, 
+    "quoteMint", quoteMint.toString(), 
+    "underMint", underlyingMint.toString(),
+    "quoteAmountPerContract", quoteAmountPerContract.toString(), 
+    "underlyingAmountPerContract", underlyingAmountPerContract.toString());
+  
   const [optionMarketKey, someNumber] = await deriveOptionKeyFromParams({
     expirationUnixTimestamp: new anchor.BN(expirationTs),
     programId: psyProgram.programId,
@@ -121,13 +130,16 @@ async function mintOptions(
   psyProgram: Program, 
   wallet: WalletContextState, 
   mintAddress: PublicKey,
+  decimals: number,
   amountTotal: number,
   issueMoment: moment.Moment,
 ): Promise<mintOptionsResponse> {
   const expirationTs = issueMoment.clone().startOf("month").add(10, "years").unix();
   const ixs: TransactionInstruction[] = [];
 
-  const market = await initOptionsMarket(psyProgram, expirationTs, WrappedSol, mintAddress);
+  const contractAmount = Math.pow(10, decimals); 
+  const market = await initOptionsMarket(
+    psyProgram, expirationTs, WrappedSol, mintAddress, contractAmount);
   if (!market) {
     throw new Error("cannot initialize options market!");
   }
@@ -206,12 +218,13 @@ async function mintOptions(
 
   // console.log("tx", tx);
 
+  const optAmountTotal = decimals ? Math.trunc(amountTotal / decimals) : amountTotal;
   const {ix, signers} = await instructions.mintOptionInstruction(
     psyProgram,
     optionTokenAccountPk,
     writerTokenAccountPk,
     underlyingTokenAccountPk,
-    new anchor.BN(1),
+    new anchor.BN(optAmountTotal),
     market
   );
   if (ix) {
@@ -323,51 +336,66 @@ export async function exercise(
   psyProgram: Program,
   provider: Provider,
   wallet: WalletContextState,
-  grant: GrantAccount,
-  amount: number) {
+  grant: GrantAccount) {
+
+  if (!grant.account.optionMarketKey) {
+    console.log("not an options account");
+    return;
+  }
+  
   const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
     SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
     grant.account.mintAddress,
     wallet.publicKey!
   );
+  console.log("srcTokenAccount", srcTokenAccountPk.toString());
 
-  if (grant.account.optionMarketKey) {
-    let market = await getOptionByKey(psyProgram, grant.account.optionMarketKey);
-    if (!market) {
-      return;
-    }
-    const destTokenAccountPk = await Token.getAssociatedTokenAddress(
-      SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      market.underlyingAssetMint,
-      wallet.publicKey!
-    );
-    const quoteTokenAccountPk = await Token.getAssociatedTokenAddress(
-      SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-      TOKEN_PROGRAM_ID,
-      market.quoteAssetMint,
-      wallet.publicKey!
-    );
-    //const ixs: TransactionInstruction[] = [];
-    const ix1 = await getOrAddAssociatedTokenAccountTx(
-      quoteTokenAccountPk, market.optionMint, psyProgram.provider, wallet.publicKey!);
-    const tx = new Transaction()
-    if (ix1) {
-      tx.add(ix1);
-    }
-    // const mint = new Token(provider.connection, market.optionMint, TOKEN_PROGRAM_ID, )
-    const ix2 = await instructions.exerciseOptionsInstruction(
-      psyProgram,
-      new anchor.BN(amount),
-      market,
-      srcTokenAccountPk,
-      destTokenAccountPk,
-      quoteTokenAccountPk
-    );
-    if (ix2) {
-      tx.add(ix2);
-    }
-    const res = await provider.send(tx);
+  const mint = new Token(
+    psyProgram.provider.connection, grant.account.mintAddress, TOKEN_PROGRAM_ID, new Keypair());
+  const accInfo = await mint.getAccountInfo(srcTokenAccountPk);
+  console.log("amount", accInfo.amount.toString());
+  const amount = accInfo.amount.toNumber();
+  if (amount === 0) {
+    throw new Error("Empty account!");
   }
+  let market = await getOptionByKey(psyProgram, grant.account.optionMarketKey);
+  if (!market) {
+    return;
+  }
+  const destTokenAccountPk = await Token.getAssociatedTokenAddress(
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    market.underlyingAssetMint,
+    wallet.publicKey!
+  );
+  console.log("destTokenAccountPk", destTokenAccountPk.toString());
+  const quoteTokenAccountPk = await Token.getAssociatedTokenAddress(
+    SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    market.quoteAssetMint,
+    wallet.publicKey!
+  );
+  console.log("quoteTokenAccountPk", quoteTokenAccountPk.toString());
+  //const ixs: TransactionInstruction[] = [];
+  const ix1 = await getOrAddAssociatedTokenAccountTx(
+    destTokenAccountPk, market.underlyingAssetMint, psyProgram.provider, wallet.publicKey!);
+  const tx = new Transaction()
+  if (ix1) {
+    tx.add(ix1);
+  }
+  // const mint = new Token(provider.connection, market.optionMint, TOKEN_PROGRAM_ID, )
+  const ix2 = await instructions.exerciseOptionsInstruction(
+    psyProgram,
+    new anchor.BN(amount),
+    market,
+    srcTokenAccountPk,
+    destTokenAccountPk,
+    quoteTokenAccountPk
+  );
+  if (ix2) {
+    tx.add(ix2);
+  }
+  const res = await provider.send(tx);
+  console.log("tx result: ", res);
 }

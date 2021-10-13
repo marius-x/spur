@@ -24,26 +24,26 @@ const GrantDetails: FC<props> = ({
   const handleUnlock = async () => {
     const success = await onUnlock(grant.publicKey);
     if (success) {
-      message.success("Grant successfully removed!");
+      message.success("Grant successfully unlocked!");
     } else {
-      message.error("Error removing grant!");
+      message.error("Error unlocking grant!");
     }
   }
 
   const handleExercise = async () => {
     const success = await onExercise(grant.publicKey);
     if (success) {
-      message.success("Grant successfully removed!");
+      message.success("Grant successfully exercised!");
     } else {
-      message.error("Error removing grant!");
+      message.error("Error exercising grant!");
     }
   }
 
   return (
     <Space direction="vertical">
       <PageHeader title="Grant" subTitle={grant.publicKey.toString()} extra={[
-        <Button key="1" onClick={handleUnlock} type="primary">Exercise</Button>,
-        <Button key="2" onClick={handleExercise} type="primary">Unlock</Button>,
+        <Button key="1" onClick={handleUnlock} type="primary">Unlock</Button>,
+        <Button key="2" onClick={handleExercise} type="primary">Exercise</Button>,
       ]} />
       <Space direction="vertical">
         <Descriptions bordered column={1}>

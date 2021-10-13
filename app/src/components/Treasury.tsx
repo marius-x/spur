@@ -5,7 +5,7 @@ import {
   Empty,
   Space,
 } from 'antd';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Transaction, TransferParams, TransferWithSeedParams } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { initGrant, revokeGrant} from '../lib/program';
 import GrantCreate, { GrantCreateParams } from './GrantCreate';
@@ -53,7 +53,6 @@ const Treasury: FC = () => {
     try {
       await initGrant(
         psyProgram!,
-        provider!, 
         client!,
         wallet, 
         new PublicKey(create.mintAddress),
@@ -72,8 +71,20 @@ const Treasury: FC = () => {
   }
 
   const handleRemoveGrant = async (grant: GrantAccount): Promise<boolean> => {
-    
-    return false
+    // make it an instruction, since the program owns the account.
+    // try {
+    //   const balance = await provider!.connection.getBalance(grant.publicKey);
+    //   console.log("grant", grant.publicKey.toString());
+    //   console.log("account balance", balance);
+    //   const ix = SystemProgram.transfer(params);
+    //   const tx = new Transaction().add(ix);
+    //   const sendTx = await provider!.send(tx);
+    //   console.log("sendTx", sendTx);
+    // } catch (err) {
+    //   console.error(err);
+    //   return false;
+    // }
+    return true;
   }
 
   const handleRevokeGrant = async (grant: GrantAccount): Promise<boolean> => {
