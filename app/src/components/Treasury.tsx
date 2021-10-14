@@ -1,4 +1,5 @@
 import React, { FC, useEffect, useState } from 'react';
+import { Switch, Route, useHistory, useRouteMatch, useParams } from "react-router-dom";
 import {
   Button, 
   Card,
@@ -24,12 +25,13 @@ enum Page {
 }
 
 const Treasury: FC = () => {
+  const history = useHistory();
+  const { page, id } = useParams<{page: string, id: string}>();
   const wallet = useWallet();
   const client = useClient();
   const psyProgram = usePsyProgram();
-  const [page, setPage] = useState<Page>(Page.Empty);
-  const [selectedGrant, setSelectedGrant] = useState<Nullable<GrantAccount>>(null);
   const [grants, setGrants] = useState<GrantAccount[]>([]);
+  const grant = grants.find(grant => grant.publicKey.toString() === id );
 
   useEffect(() => {
     const setAsync = async () => {
@@ -45,8 +47,7 @@ const Treasury: FC = () => {
   }, [client, wallet]);
 
   const handleSelectGrant = (grant: GrantAccount) => {
-    setSelectedGrant(grant);
-    setPage(Page.Details);
+    history.push(`/treasury/details/${grant.publicKey.toString()}`);
   }
 
   const handleCreateGrant = async (create: GrantCreateParams): Promise<boolean> => {
@@ -70,23 +71,6 @@ const Treasury: FC = () => {
     }
   }
 
-  const handleRemoveGrant = async (grant: GrantAccount): Promise<boolean> => {
-    // make it an instruction, since the program owns the account.
-    // try {
-    //   const balance = await provider!.connection.getBalance(grant.publicKey);
-    //   console.log("grant", grant.publicKey.toString());
-    //   console.log("account balance", balance);
-    //   const ix = SystemProgram.transfer(params);
-    //   const tx = new Transaction().add(ix);
-    //   const sendTx = await provider!.send(tx);
-    //   console.log("sendTx", sendTx);
-    // } catch (err) {
-    //   console.error(err);
-    //   return false;
-    // }
-    return true;
-  }
-
   const handleRevokeGrant = async (grant: GrantAccount): Promise<boolean> => {
     try {
       await revokeGrant(psyProgram!, client!, grant, wallet);
@@ -97,9 +81,11 @@ const Treasury: FC = () => {
     }
   }
 
-  const isSelected = (grant: GrantAccount): boolean => {
-    if (!selectedGrant || (page !== Page.Details)) { return false }
-    return selectedGrant.publicKey.equals(grant.publicKey);
+  const isSelected = (pk: PublicKey): boolean => {
+    if (!grant || page !== "details") {
+      return false; 
+    }
+    return grant.publicKey.equals(pk);
   }
 
   return (
@@ -107,8 +93,8 @@ const Treasury: FC = () => {
       <Space align="start" size="large">
       <Space direction="vertical">
       <Button 
-        type={page === Page.Create ? "default" : "primary"} 
-        onClick={() => setPage(Page.Create)}
+        type="primary"
+        onClick={() => history.push('/treasury/create') }
       >
         + New Grant
       </Button>
@@ -117,7 +103,7 @@ const Treasury: FC = () => {
         renderItem={grant => (
           <List.Item>
             <Button 
-              type={isSelected(grant) ? "default" : "link"} 
+              type={isSelected(grant.publicKey) ? "default" : "link"} 
               onClick={() => handleSelectGrant(grant)}
             >
               {shortSha(grant.publicKey.toString())}
@@ -127,18 +113,17 @@ const Treasury: FC = () => {
       />
       </Space>
       <Space>
-        <Card style={{ width: "800px", minHeight:"600px"}}>
-          {
-            (page === Page.Create) ? (<GrantCreate onCreate={handleCreateGrant} />) : 
-            (page === Page.Details && selectedGrant) ? (
-              <GrantDetails
-                psyProgram={psyProgram!}
-                grant={selectedGrant}
-                onRemove={handleRemoveGrant}
-                onRevoke={handleRevokeGrant}
-              />
-            ) : (<Empty description="No Grant Selected" />)
-          }
+        <Card style={{ width: "648px", minHeight:"648px", borderRadius: "8px" }}>
+          {(
+            (page === "create") ? <GrantCreate onCreate={handleCreateGrant} /> :
+            (page === "details" && !grant) ? <Empty description="Grant Not Found" /> :
+            (page === "details" && grant) ?
+              <GrantDetails grant={grant}
+                  psyProgram={psyProgram!}
+                  onRevoke={handleRevokeGrant}
+              /> :
+            <Empty description="No Grant Selected" />
+          )}
         </Card>
       </Space>
       </Space>

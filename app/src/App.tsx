@@ -1,5 +1,5 @@
 import React, { FC } from 'react';
-import { Layout, Select, Space, Typography } from 'antd';
+import { Divider, Layout, Select, Space, Typography } from 'antd';
 import { Content, Header, Footer } from 'antd/lib/layout/layout';
 import {
   BrowserRouter as Router,
@@ -33,27 +33,27 @@ const App: FC = () => {
       <WalletModalProvider>
       <Router>
         <Layout>
-          <Header>
+          <Header style={{ backgroundColor: "white", height: "70px", borderBottomColor: "#24acfc", borderBottomStyle: "solid", borderBottomWidth: "2px" }}>
             <Space>
-              <Link to="/"><Title level={3} >Owner Comp</Title></Link>
+              <Link to="/">
+                <img src="/oc-blue.png" alt="" style={{ width: "234px", height: "50px", marginBottom: "6px" }} />
+              </Link>
+              <Divider type="vertical" />
+              <Title level={5} style={{marginTop: "10px"}}>Treasury</Title>
             </Space>
-            <Space style={{ float: "right", margin: '6px' }}><WalletMultiButton /></Space>
+            <Space style={{ float: "right", margin: '6px' }}><WalletMultiButton style={{backgroundColor: "#24acfc"}} /></Space>
             <Space style={{ float: "right" }}>
               <Select size="large" defaultValue="devnet" bordered={false} onSelect={setEndpoint}>
-                <Option value="mainnet-beta">Mainnet</Option>
-                <Option value="devnet">Devnet</Option>
-                <Option value="local">Local</Option>
+                <Option disabled value="mainnet-beta">mainnet</Option>
+                <Option value="devnet">devnet</Option>
+                <Option value="local">local</Option>
               </Select>
             </Space>
           </Header>
           <Content style={{ padding: "24px 48px", minHeight: "384px"}}>
             <Switch>
-              <Route path="/about">
-                <About />
-              </Route>
-              <Route path="/">
-                <Home />
-              </Route>
+              <Route path="/about"><About /></Route>
+              <Route path="/"><Home /></Route>
             </Switch>
           </Content>
           <Footer style={{ textAlign: "center", position: "fixed", bottom: "0", width: "100%" }}>

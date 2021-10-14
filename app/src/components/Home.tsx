@@ -1,41 +1,50 @@
-import React, { FC, useState } from 'react';
-import {
-  Button, 
-  Space, 
-} from 'antd';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-
-import Treasury from './Treasury';
+import {
+  Button,
+  Space
+} from 'antd';
+import React, { FC } from 'react';
+import { Route, useHistory } from "react-router-dom";
 import Contributor from './Contributor';
+import Treasury from './Treasury';
+
 
 enum AccountType {
-  None,
-  Treasury,
-  Contributor
+  Treasury = "treasury",
+  Contributor = "contributor"
 }
 
 const Home: FC = () => {
+  const history = useHistory();
   const wallet = useWallet();
-  // TODO: make navigation routable
-  const [accountView, setAccountView] = useState<AccountType>(AccountType.None);
 
   if (!wallet.connected) {
     return <ConnectWallet />
   }
 
-  if (accountView === AccountType.Treasury) {
-    return <Treasury />
-  } else if (accountView === AccountType.Contributor) {
-    return <Contributor />
-  } else {
-    return <SelectAccountView onSelect={setAccountView} />
+  const handleSelectAccount = (accountType: AccountType) => {
+    history.push(`/${accountType}`);
   }
+
+  return (
+    <div>
+      <Route path={[`/treasury/:page/:id`, '/treasury/:page', '/treasury']}>
+        <Treasury />
+      </Route>
+      <Route path={`/contributor`}>
+        <Contributor />
+      </Route>
+      <Route exact path={`/`}>
+        <SelectAccountView onSelect={handleSelectAccount} />
+      </Route>
+    </div>
+  );
 };
 
 const ConnectWallet: FC = () => (
   <Space direction="vertical" align="center">
-    <WalletMultiButton />
+    <WalletMultiButton style={{backgroundColor: "#24acfc"}} />
   </Space>
 );
 

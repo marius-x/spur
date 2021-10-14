@@ -119,13 +119,13 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
       <Form
         form={form}
         name="basic"
-        labelCol={{ span: 6 }}
+        labelCol={{ span: 5 }}
         wrapperCol={{ span: 16 }}
         initialValues={{ remember: true }}
         onFinish={handleSubmit}
         onFinishFailed={errorInfo => { console.log("failed", errorInfo); }}
         autoComplete="off"
-        style={{ width: "600px" }}
+        style={{ width: "648px" }}
       >
         <Form.Item
           label="Recipient"
@@ -149,7 +149,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           </Select>
         </Form.Item>
         <Form.Item
-          wrapperCol={{ span: 16, offset: 6 }}
+          wrapperCol={{ span: 16, offset: 5 }}
           label=""
           name="mintAddress"
           initialValue={CustomMint.toString()}
@@ -209,20 +209,20 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
         </Form.Item>
 
         <Form.Item
-          label="Number of Periods"
+          label="# Periods"
           name="numPeriods"
         >
           <InputNumber readOnly />
         </Form.Item>
 
         <Form.Item
-          label="Amount per Period"
+          label="Amount / Period"
           name="amountPerPeriod"
         >
           <InputNumber readOnly />
         </Form.Item>
 
-        <Form.Item wrapperCol={{ offset: 6, span: 16 }}>
+        <Form.Item wrapperCol={{ offset: 5, span: 16 }}>
           <Button type="primary" htmlType="submit">
             Create
           </Button>

@@ -1,4 +1,5 @@
 import React, { FC, useEffect, useState } from 'react';
+import { Switch, Route, useHistory, useRouteMatch, useParams } from "react-router-dom";
 import moment from 'moment';
 import {
   message,
@@ -7,6 +8,7 @@ import {
   PageHeader,
   Space,
   Spin,
+  Empty,
 } from 'antd';
 import { GrantAccount } from '../lib/client';
 import { intervalToStr } from '../lib/util';
@@ -17,16 +19,15 @@ import { getMintDecimals } from '../lib/program';
 interface props {
   psyProgram: Program,
   grant: GrantAccount,
-  onRemove: (grant: GrantAccount) => Promise<boolean>,
   onRevoke: (grant: GrantAccount) => Promise<boolean>,
 }
 
 const GrantDetails: FC<props> = ({ 
-  psyProgram, grant, onRemove, onRevoke,
+  psyProgram, grant, onRevoke,
 }) => {
   const [market, setMarket] = useState<Nullable<OptionMarketWithKey>>(null);
   const [decimals, setDecimals] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   
   useEffect(() => {
     setLoading(true);
@@ -48,14 +49,6 @@ const GrantDetails: FC<props> = ({
     return <Spin />;
   }
 
-  const handleRemove = async () => {
-    const success = await onRemove(grant);
-    if (success) {
-      message.success("Grant successfully removed!");
-    } else {
-      message.error("Error removing grant!");
-    }
-  }
   const handleRevoke = async () => {
     const success = await onRevoke(grant);
     if (success) {
@@ -65,10 +58,7 @@ const GrantDetails: FC<props> = ({
     }
   }
 
-  const canRemove = grant.account.revoked;
-  const actionHandler = canRemove ? handleRemove : handleRevoke;
-  const action = canRemove ? "Remove" : "Revoke"
-
+  const isRevoked = grant.account.revoked;
   const mint = market ? market.underlyingAssetMint : grant.account.mintAddress;
   const issueDateStr = moment.unix(grant.account.issueTs).format("MM-DD-YYYY");
   const endDateStr = moment.unix(grant.account.issueTs)
@@ -88,7 +78,7 @@ const GrantDetails: FC<props> = ({
       <PageHeader
         title="Grant"
         subTitle={grant.publicKey.toString()}
-        extra={[<Button key="1" onClick={actionHandler} type="primary">{action}</Button>]}
+        extra={[<Button disabled={isRevoked} key="1" onClick={handleRevoke} type="primary" style={{ float: "right" }}>Revoke</Button>]}
       />
       <Space direction="vertical">
         <Descriptions bordered column={1}>

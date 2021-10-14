@@ -99,7 +99,7 @@ const Contributor: FC = () => {
       />
       </Space>
       <Space>
-        <Card style={{ width: "800px", minHeight:"600px"}}>
+        <Card style={{ width: "648px", minHeight:"648px", borderRadius: "8px" }}>
           {
             (page === Page.Details && selectedGrant) ? (
               <ContGrantDetails
