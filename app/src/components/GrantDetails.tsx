@@ -12,6 +12,7 @@ import { GrantAccount } from '../lib/client';
 import { intervalToStr } from '../lib/util';
 import { Program } from '@project-serum/anchor';
 import { getOptionByKey, OptionMarketWithKey } from '@mithraic-labs/psy-american';
+import { getMintDecimals } from '../lib/program';
 
 interface props {
   psyProgram: Program,
@@ -24,11 +25,14 @@ const GrantDetails: FC<props> = ({
   psyProgram, grant, onRemove, onRevoke,
 }) => {
   const [market, setMarket] = useState<Nullable<OptionMarketWithKey>>(null);
+  const [decimals, setDecimals] = useState(0);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     setLoading(true);
     const loadAsync = async () => {
+      setDecimals(await getMintDecimals(
+        psyProgram.provider.connection, grant.account.mintAddress));
       if (!grant.account.optionMarketKey) {
         setLoading(false);
         return;
@@ -38,7 +42,7 @@ const GrantDetails: FC<props> = ({
       setLoading(false);
     };
     loadAsync();
-  }, [psyProgram, grant.account.optionMarketKey]);
+  }, [psyProgram, grant.account.optionMarketKey, grant.account.mintAddress]);
 
   if (loading) {
     return <Spin />;
@@ -77,6 +81,7 @@ const GrantDetails: FC<props> = ({
   const vestIntervalStr = intervalToStr(grant.account.vestIntervalSec);
   const lastUnlockStr = grant.account.lastUnlockTs ? 
     moment.unix(grant.account.lastUnlockTs).format("MM/DD/YYYY") : "N/A"
+  const amountTotal = (grant.account.amountTotal * 100 / Math.pow(10, decimals)) / 100;
 
   return (
     <Space direction="vertical">
@@ -89,7 +94,7 @@ const GrantDetails: FC<props> = ({
         <Descriptions bordered column={1}>
           <Descriptions.Item label="Recipient">{grant.account.recipientWallet.toString()}</Descriptions.Item>
           <Descriptions.Item label="Mint">{mint.toString()}</Descriptions.Item>
-          <Descriptions.Item label="Amount">{grant.account.amountTotal.toString()}</Descriptions.Item>
+          <Descriptions.Item label="Amount">{amountTotal.toString()}</Descriptions.Item>
           <Descriptions.Item label="Options">{grant.account.optionMarketKey ? "Yes": "No"}</Descriptions.Item>
           <Descriptions.Item label="Issue Date">{issueDateStr}</Descriptions.Item>
           <Descriptions.Item label="End Date">{endDateStr}</Descriptions.Item>
@@ -97,8 +102,7 @@ const GrantDetails: FC<props> = ({
           <Descriptions.Item label="Vest Interval">{vestIntervalStr}</Descriptions.Item>
           <Descriptions.Item label="Last Unlock">{lastUnlockStr}</Descriptions.Item>
           <Descriptions.Item label="Amount Unlocked">{grant.account.amountUnlocked}</Descriptions.Item>
-          <Descriptions.Item label="Revoked">{grant.account.revoked ? "Yes" : "No"}
-          </Descriptions.Item>
+          <Descriptions.Item label="Revoked">{grant.account.revoked ? "Yes" : "No"}</Descriptions.Item>
         </Descriptions>
       </Space>
     </Space>

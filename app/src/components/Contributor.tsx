@@ -1,7 +1,9 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import {
   Button,
-  Card, Empty,
+  Card, 
+  Empty,
+  List,
   Space
 } from 'antd';
 import React, { FC, useEffect, useState } from 'react';
@@ -27,19 +29,16 @@ const Contributor: FC = () => {
   const [selectedGrant, setSelectedGrant] = useState<Nullable<GrantAccount>>(null);
 
   const [grants, setGrants] = useState<GrantAccount[]>([]);
-  const [loadingGrants, setLoadingGrants] = useState(false);
 
   useEffect(() => {
-    setLoadingGrants(true);
     const setAsync = async () => {
       if (!client || !wallet?.publicKey) {
         setGrants([]);
-        setLoadingGrants(false);
         return;
       }
-      const grantsFound = await client.findGrantsByRecipient(wallet.publicKey);
-      setGrants(grantsFound);
-      setLoadingGrants(false);
+      const foundGrants = await client.findGrantsByRecipient(wallet.publicKey);
+      const sortedGrants = foundGrants.sort((a: GrantAccount, b: GrantAccount): number => a.account.issueTs - b.account.issueTs);
+      setGrants(sortedGrants);
     };
     setAsync();
   }, [client, wallet]);
@@ -64,7 +63,6 @@ const Contributor: FC = () => {
       return false;
     }
     try {
-
       await exercise(
         psyProgram!,
         provider!,
@@ -77,25 +75,36 @@ const Contributor: FC = () => {
     }
   }
 
+  const isSelected = (grant: GrantAccount): boolean => {
+    if (!selectedGrant || (page !== Page.Details)) { return false }
+    return selectedGrant.publicKey.equals(grant.publicKey);
+  }
+
   return (
     <div>
       <Space align="start" size="large">
       <Space direction="vertical">
-      {
-        grants.map((grant: GrantAccount) => (
-          <Card key={grant.publicKey.toString()}>
-            <Button type="link" onClick={() => handleSelectGrant(grant)}>
+      <List
+        dataSource={grants}
+        renderItem={grant => (
+          <List.Item>
+            <Button 
+              type={isSelected(grant) ? "default" : "link"} 
+              onClick={() => handleSelectGrant(grant)}
+            >
               {shortSha(grant.publicKey.toString())}
             </Button>
-          </Card>
-        ))
-      }
+          </List.Item>
+        )}
+      />
       </Space>
       <Space>
         <Card style={{ width: "800px", minHeight:"600px"}}>
           {
             (page === Page.Details && selectedGrant) ? (
-              <ContGrantDetails 
+              <ContGrantDetails
+                wallet={wallet.publicKey!}
+                psyProgram={psyProgram!}
                 grant={selectedGrant}
                 onUnlock={handleUnlockGrant}
                 onExercise={handleExerciseGrant}

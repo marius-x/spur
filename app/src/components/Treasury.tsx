@@ -3,6 +3,7 @@ import {
   Button, 
   Card,
   Empty,
+  List,
   Space,
 } from 'antd';
 import { PublicKey, SystemProgram, Transaction, TransferParams, TransferWithSeedParams } from '@solana/web3.js';
@@ -10,7 +11,6 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { initGrant, revokeGrant} from '../lib/program';
 import GrantCreate, { GrantCreateParams } from './GrantCreate';
 import GrantDetails from './GrantDetails';
-import { useProvider } from '../hooks/network';
 import { shortSha } from '../util/text';
 import useClient from '../hooks/spurClient';
 import { unitOfTimeToSec } from '../util/time';
@@ -24,7 +24,6 @@ enum Page {
 }
 
 const Treasury: FC = () => {
-  const provider = useProvider();
   const wallet = useWallet();
   const client = useClient();
   const psyProgram = usePsyProgram();
@@ -38,8 +37,9 @@ const Treasury: FC = () => {
         setGrants([]);
         return;
       }
-      const grantsFound = await client.findGrantsBySender(wallet.publicKey);
-      setGrants(grantsFound);
+      const foundGrants = await client.findGrantsBySender(wallet.publicKey);
+      const sortedGrants = foundGrants.sort((a: GrantAccount, b: GrantAccount): number => a.account.issueTs - b.account.issueTs);
+      setGrants(sortedGrants);
     };
     setAsync();
   }, [client, wallet]);
@@ -97,20 +97,34 @@ const Treasury: FC = () => {
     }
   }
 
+  const isSelected = (grant: GrantAccount): boolean => {
+    if (!selectedGrant || (page !== Page.Details)) { return false }
+    return selectedGrant.publicKey.equals(grant.publicKey);
+  }
+
   return (
     <div>
       <Space align="start" size="large">
       <Space direction="vertical">
-      <Button type="primary" onClick={() => setPage(Page.Create)}>+ New Grant</Button>
-      {
-        grants.map((grant: GrantAccount) => (
-          <Card key={grant.publicKey.toString()}>
-            <Button type="link" onClick={() => handleSelectGrant(grant)}>
+      <Button 
+        type={page === Page.Create ? "default" : "primary"} 
+        onClick={() => setPage(Page.Create)}
+      >
+        + New Grant
+      </Button>
+      <List
+        dataSource={grants}
+        renderItem={grant => (
+          <List.Item>
+            <Button 
+              type={isSelected(grant) ? "default" : "link"} 
+              onClick={() => handleSelectGrant(grant)}
+            >
               {shortSha(grant.publicKey.toString())}
             </Button>
-          </Card>
-        ))
-      }
+          </List.Item>
+        )}
+      />
       </Space>
       <Space>
         <Card style={{ width: "800px", minHeight:"600px"}}>

@@ -127,14 +127,14 @@ pub struct UnlockGrant<'info> {
   pub clock: Sysvar<'info, Clock>,
 }
 
-impl<'info> UnlockGrant<'info> {
-  pub fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
-    let cpi_accounts = Transfer {
-      from: self.grant_token_account.to_account_info().clone(),
-      to: self.recipient_token_account.to_account_info().clone(),
-      authority: self.pda.clone(),
-    };
-    let cpi_program = self.token_program.to_account_info();
-    CpiContext::new(cpi_program, cpi_accounts)
-  }
-}
+// impl<'info> UnlockGrant<'info> {
+//   pub fn into_transfer_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+//     let cpi_accounts = Transfer {
+//       from: self.grant_token_account.to_account_info().clone(),
+//       to: self.recipient_token_account.to_account_info().clone(),
+//       authority: self.pda.clone(),
+//     };
+//     let cpi_program = self.token_program.to_account_info();
+//     CpiContext::new(cpi_program, cpi_accounts)
+//   }
+// }

@@ -23,6 +23,7 @@ const SolMint = new PublicKey("77ZJLL97MSG8kFePoLp69YPYR2n9JXmajqwoNDAHfhLB");
 const UsdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const CustomMint = new PublicKey("ZgDg4kcSHnVpfp7qhrpjsiZFFNtKNWtF1Y2DfoMUxgB");
 
+// TODO: add more tokens
 const TOKEN_LIBRARY = [
   {
     name: "MNGO",
@@ -89,13 +90,12 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
     if (!totalAmount || !numPeriods) {
       form.resetFields(["amountPerPeriod"]);
     } else {
-      form.setFieldsValue({ amountPerPeriod: totalAmount / numPeriods });
+      const amountPerPeriod = Math.trunc(totalAmount * 100 / numPeriods) / 100;
+      form.setFieldsValue({ amountPerPeriod });
     }
   }
 
   const handleSubmit = async (values: FormValues) => {
-    console.log("values r", values.duration[0]);
-    console.log("values p", values.duration[0].toDate());
     const success = await onCreate({
       amount: values.amount,
       cliff: values.cliff?.clone() ?? null,
@@ -174,7 +174,9 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           rules={[{ required: true, message: 'Please input amount!' }]}
           initialValue={100}
         >
-          <InputNumber onChange={updateAmountPerPeriod} />
+          <InputNumber
+            step={1}
+            onChange={updateAmountPerPeriod} />
         </Form.Item>
 
         <Form.Item

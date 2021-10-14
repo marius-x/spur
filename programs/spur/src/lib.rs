@@ -1,10 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token;
+use anchor_spl::token::{self, Transfer};
 use spl_associated_token_account::{get_associated_token_address};
 // //use spl_token::instruction::AuthorityType;
 // use anchor_spl::associated_token;
-
-
 
 use context::*;
 
@@ -103,7 +101,7 @@ pub mod spur {
     pub fn unlock_grant(
         ctx: Context<UnlockGrant>,
     ) -> ProgramResult {
-        let grant_account = &ctx.accounts.grant_account;
+        let grant_account = &mut ctx.accounts.grant_account;
         let expected_token_account = get_associated_token_address(
             &grant_account.recipient_wallet.clone(),
             &grant_account.mint_address.clone()
@@ -117,6 +115,10 @@ pub mod spur {
         let grant_end_ts = grant_account.issue_ts + grant_account.duration_sec as i64;
         let unlock_end_ts = ctx.accounts.clock.unix_timestamp as i64;
 
+        if unlock_end_ts <= grant_start_ts {
+            msg!("Grant issue time is in the future!");
+            return Err(ProgramError::InvalidArgument);
+        }
         if grant_account.initial_cliff_sec > 0 {
             let initial_cliff_ts = grant_account.issue_ts + 
                 grant_account.initial_cliff_sec as i64;
@@ -126,34 +128,34 @@ pub mod spur {
             }
         }
 
-        let mut unlock_amount = grant_account.amount_total - 
-            grant_account.amount_unlocked;
-
+        let mut unlock_amount_available = grant_account.amount_total;
         if unlock_end_ts < grant_end_ts {
-            let mut unlock_start_ts = grant_account.issue_ts;
-            if grant_account.last_unlock_ts > 0 {
-                unlock_start_ts = grant_account.last_unlock_ts;
-            }
-            let unlock_num_periods = (unlock_end_ts - unlock_start_ts) as u64 
-                / grant_account.vest_interval_sec;
-            let grant_num_periods = (grant_end_ts - grant_start_ts) as u64 
+            // Grant is not yet fully vested
+            let grant_num_periods = (grant_account.duration_sec + grant_account.vest_interval_sec - 1)
                 / grant_account.vest_interval_sec;
             let amount_per_period = grant_account.amount_total / grant_num_periods;
-            unlock_amount = amount_per_period * unlock_num_periods;
+            let duration_since_issue_sec = (unlock_end_ts - grant_start_ts) as u64;
+            let unlock_num_periods = duration_since_issue_sec / grant_account.vest_interval_sec;
+            unlock_amount_available = amount_per_period * unlock_num_periods;
         }
-
-        if unlock_amount == 0 {
-            msg!("No amount to unlock!");
+        let unlock_amount = unlock_amount_available - grant_account.amount_unlocked;
+        if unlock_amount <= 0 {
+            msg!("No amount left to unlock!");
             return Err(ProgramError::InvalidArgument);
         }
-
         let seeds = &[&GRANT_PDA_SEED[..], &[grant_account.bump]];
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.grant_token_account.to_account_info().clone(),
+            to: ctx.accounts.recipient_token_account.to_account_info().clone(),
+            authority: ctx.accounts.pda.clone(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
         token::transfer(
-            ctx.accounts
-                .into_transfer_context()
-                .with_signer(&[&seeds[..]]),
-                unlock_amount,
+            CpiContext::new(cpi_program, cpi_accounts).with_signer(&[&seeds[..]]),
+            unlock_amount,
         )?;
+        grant_account.amount_unlocked += unlock_amount;
+        grant_account.last_unlock_ts = unlock_end_ts;
         Ok(())
     }
 }

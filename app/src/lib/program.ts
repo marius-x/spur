@@ -30,14 +30,15 @@ export async function initGrant(
   let optMarketKey: Nullable<PublicKey> = null;
 
   if (issueOptions) {
-    const decimals = await getDecimals(psyProgram.provider.connection, mintAddress);
     const optResp = await mintOptions(
-      psyProgram, wallet, mintAddress, decimals, amountTotal, issueMoment);
+      psyProgram, wallet, mintAddress, amountTotal, issueMoment);
     effectiveMintAddress = optResp.mintAddress;
     optIxs = optResp.ixs;
     optMarketKey = optResp.marketKey;
     optSigners = optResp.signers;
-    amountTotal = decimals ? Math.trunc(amountTotal / decimals) : amountTotal;
+  } else {
+    const decimals = await getMintDecimals(psyProgram.provider.connection, mintAddress);
+    amountTotal = amountTotal * Math.pow(10, decimals);
   }
 
   const srcTokenAccountPk = await Token.getAssociatedTokenAddress(
@@ -47,9 +48,6 @@ export async function initGrant(
     wallet.publicKey!
   );
 
-  console.log("optIxs", optIxs);
-  console.log("optSigners", optSigners);
-  
   await client.createGrant(
     effectiveMintAddress,
     optMarketKey,
@@ -70,38 +68,34 @@ interface mintOptionsResponse {
   ixs: TransactionInstruction[],
   signers: anchor.web3.Signer[],
   mintAddress: PublicKey,
-  marketKey: PublicKey
+  marketKey: PublicKey,
 }
 
 const WrappedSol = new PublicKey("So11111111111111111111111111111111111111112");
-
+// Fixed strike price 1 lamport per 1 token.
 const quoteAmountPerContract = new anchor.BN(1);
-//const underlyingAmountPerContract = new anchor.BN(1);
 
-async function getDecimals(connection: Connection, mint: PublicKey) {
+export async function getMintDecimals(connection: Connection, mint: PublicKey) {
   const mintToken = new Token(connection, mint, TOKEN_PROGRAM_ID, new Keypair());
   const mintInfo = await mintToken.getMintInfo();
   return mintInfo.decimals;
 }
 
-// Fixed strike price 1Lamport per 1 token.
+export async function getOptContractAmount(connection:Connection, mint: PublicKey) {
+  const mintDecimals = await getMintDecimals(connection, mint);
+  return Math.pow(10, mintDecimals);
+}
+
 async function initOptionsMarket(
   psyProgram: Program,
   expirationTs: number,
   quoteMint: PublicKey,
-  underlyingMint: PublicKey,
-  underlyingAmount: number,
+  underlyingMint: PublicKey
 ): Promise<Nullable<OptionMarketWithKey>> {
-  const underlyingAmountPerContract = new anchor.BN(underlyingAmount);
-  console.log("deriveOptionKeyFromParams..", 
-    "programId", psyProgram.programId.toString(), 
-    "expTs", expirationTs, 
-    "quoteMint", quoteMint.toString(), 
-    "underMint", underlyingMint.toString(),
-    "quoteAmountPerContract", quoteAmountPerContract.toString(), 
-    "underlyingAmountPerContract", underlyingAmountPerContract.toString());
-  
-  const [optionMarketKey, someNumber] = await deriveOptionKeyFromParams({
+  const contractAmount = await getOptContractAmount(psyProgram.provider.connection, underlyingMint);
+  const underlyingAmountPerContract = new anchor.BN(contractAmount);
+
+  const [optionMarketKey, ] = await deriveOptionKeyFromParams({
     expirationUnixTimestamp: new anchor.BN(expirationTs),
     programId: psyProgram.programId,
     quoteAmountPerContract,
@@ -109,10 +103,10 @@ async function initOptionsMarket(
     underlyingAmountPerContract,
     underlyingMint
   });
-  console.log("deriveOptionKeyFromParams", optionMarketKey.toString(), someNumber);
+  console.log("deriveOptionKeyFromParams:", optionMarketKey.toString());
+
   let market = await getOptionByKey(psyProgram, optionMarketKey);
   if (!market) {
-    console.log("initializeMarket..")
     const resp = await instructions.initializeMarket(psyProgram, {
       expirationUnixTimestamp: new anchor.BN(expirationTs),
       quoteAmountPerContract,
@@ -120,7 +114,7 @@ async function initOptionsMarket(
       underlyingAmountPerContract,
       underlyingMint,
     });
-    console.log("initializeMarket", resp);
+    console.log("initializeMarket:", resp.tx);
     market = await getOptionByKey(psyProgram, optionMarketKey);
   }
   return market;
@@ -130,41 +124,34 @@ async function mintOptions(
   psyProgram: Program, 
   wallet: WalletContextState, 
   mintAddress: PublicKey,
-  decimals: number,
   amountTotal: number,
   issueMoment: moment.Moment,
 ): Promise<mintOptionsResponse> {
   const expirationTs = issueMoment.clone().startOf("month").add(10, "years").unix();
   const ixs: TransactionInstruction[] = [];
-
-  const contractAmount = Math.pow(10, decimals); 
   const market = await initOptionsMarket(
-    psyProgram, expirationTs, WrappedSol, mintAddress, contractAmount);
+    psyProgram, expirationTs, WrappedSol, mintAddress);
   if (!market) {
     throw new Error("cannot initialize options market!");
   }
-  console.log("market", 
-    "optionMint", market.optionMint.toString(), 
-    "writerMint", market.writerTokenMint.toString(), 
-    "underlyingMint", market.underlyingAssetMint.toString());
 
   const m = market;
-  console.log("m", 
-  "optionMint", m.optionMint.toString(),
-  "writerTokenMint", m.writerTokenMint.toString(),
-  "underlyingAssetMint", m.underlyingAssetMint.toString(),
-  "quoteAssetMint", m.quoteAssetMint.toString(),
-  "underlyingAssetPool", m.underlyingAssetPool.toString(),
-  "quoteAssetPool", m.quoteAssetPool.toString(),
-  "mintFeeAccount", m.mintFeeAccount.toString(),
-  "exerciseFeeAccount", m.exerciseFeeAccount.toString(),
-  "underlyingAmountPerContract", m.underlyingAmountPerContract.toString(),
-  "quoteAmountPerContract", m.quoteAmountPerContract.toString(),
-  "expirationUnixTimestamp", m.expirationUnixTimestamp.toString(),
-  "expired", m.expired,
-  "bumpSeed", m.bumpSeed,
+  console.log(
+    "initOptionsMarket:", 
+    "optionMint", m.optionMint.toString(),
+    "writerTokenMint", m.writerTokenMint.toString(),
+    "underlyingAssetMint", m.underlyingAssetMint.toString(),
+    "quoteAssetMint", m.quoteAssetMint.toString(),
+    "underlyingAssetPool", m.underlyingAssetPool.toString(),
+    "quoteAssetPool", m.quoteAssetPool.toString(),
+    "mintFeeAccount", m.mintFeeAccount.toString(),
+    "exerciseFeeAccount", m.exerciseFeeAccount.toString(),
+    "underlyingAmountPerContract", m.underlyingAmountPerContract.toString(),
+    "quoteAmountPerContract", m.quoteAmountPerContract.toString(),
+    "expirationUnixTimestamp", m.expirationUnixTimestamp.toString(),
+    "expired", m.expired,
+    "bumpSeed", m.bumpSeed,
   );
-
   console.log("feeAmount", feeAmountPerContract(market.underlyingAmountPerContract).toNumber());
 
   const optionTokenAccountPk = await Token.getAssociatedTokenAddress(
@@ -173,7 +160,6 @@ async function mintOptions(
     market.optionMint,
     wallet.publicKey!
   );
-
   const ix1 = await getOrAddAssociatedTokenAccountTx(
     optionTokenAccountPk, market.optionMint, psyProgram.provider, wallet.publicKey!);
   if (ix1) {
@@ -186,7 +172,6 @@ async function mintOptions(
     market.writerTokenMint,
     wallet.publicKey!
   );
-
   const ix2 = await getOrAddAssociatedTokenAccountTx(
     writerTokenAccountPk, market.writerTokenMint, psyProgram.provider, wallet.publicKey!);
   if (ix2) {
@@ -200,49 +185,17 @@ async function mintOptions(
     wallet.publicKey!
   );
 
-  console.log("optionTokenAccountPk", optionTokenAccountPk.toString());
-  console.log("writerTokenAccountPk", writerTokenAccountPk.toString());
-  console.log("underlyingTokenAccountPk", underlyingTokenAccountPk.toString());
-
-  // const ix = null;
-  // const signers: anchor.web3.Signer[] = [];
-
-  // const {tx} = await instructions.mintOptionsTx(
-  //   psyProgram,
-  //   optionTokenAccountPk,
-  //   writerTokenAccountPk,
-  //   underlyingTokenAccountPk,
-  //   new anchor.BN(10),
-  //   market
-  // );
-
-  // console.log("tx", tx);
-
-  const optAmountTotal = decimals ? Math.trunc(amountTotal / decimals) : amountTotal;
   const {ix, signers} = await instructions.mintOptionInstruction(
     psyProgram,
     optionTokenAccountPk,
     writerTokenAccountPk,
     underlyingTokenAccountPk,
-    new anchor.BN(optAmountTotal),
+    new anchor.BN(amountTotal),
     market
   );
   if (ix) {
     ixs.push(ix);
   }
-
-  // remainingAccounts.push({
-  //   pubkey: optionTokenAccountPk,
-  //   isWritable: true,
-  //   isSigner: false,
-  // });
-  // remainingAccounts.push({
-  //   pubkey: writerTokenAccountPk,
-  //   isWritable: true,
-  //   isSigner: false,
-  // });
-
-  console.log("ix", ix, "signers", signers);
 
   return {
     ixs,
@@ -377,6 +330,15 @@ export async function exercise(
     wallet.publicKey!
   );
   console.log("quoteTokenAccountPk", quoteTokenAccountPk.toString());
+  // if (market.quoteAssetMint.equals(WrappedSol)) {
+  //   console.log("wrapping SOL", amount);
+  //   Token.createWrappedNativeAccount(
+  //     psyProgram.provider.connection, 
+  //     TOKEN_PROGRAM_ID, 
+  //     wallet.publicKey!, 
+  //     new Keypair(), 
+  //     amount);
+  // }
   //const ixs: TransactionInstruction[] = [];
   const ix1 = await getOrAddAssociatedTokenAccountTx(
     destTokenAccountPk, market.underlyingAssetMint, psyProgram.provider, wallet.publicKey!);
