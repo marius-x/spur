@@ -89,7 +89,7 @@ const Treasury: FC = () => {
 
   const handleRevokeGrant = async (grant: GrantAccount): Promise<boolean> => {
     try {
-      await revokeGrant(client!, grant, wallet);
+      await revokeGrant(psyProgram!, client!, grant, wallet);
       return true;
     } catch (err) {
       console.error(err);

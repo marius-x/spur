@@ -3,7 +3,7 @@ import * as anchor from '@project-serum/anchor';
 import { Program, Provider } from '@project-serum/anchor';
 import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { WalletContextState } from '@solana/wallet-adapter-react';
-import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { Client, GrantAccount } from './client';
 
 
@@ -206,6 +206,7 @@ async function mintOptions(
 }
 
 export async function revokeGrant(
+  psyProgram: Program,
   client: Client, 
   grant: GrantAccount, 
   wallet: WalletContextState
@@ -222,6 +223,49 @@ export async function revokeGrant(
     senderTokenAccountPk,
     wallet.publicKey!,
     []);
+  if (!grant.account.optionMarketKey) {
+    return;
+  }
+  let market = await getOptionByKey(psyProgram, grant.account.optionMarketKey);
+  if (!market) {
+    console.error("Cannot find market!");
+    return;
+  }
+  console.log("closing opt position");
+  const tx = new Transaction();
+  const token = new Token(
+    psyProgram.provider.connection, 
+    market.optionMint,
+    TOKEN_PROGRAM_ID, 
+    new Keypair());
+  const optTokenAccount = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    market.optionMint,
+    wallet.publicKey!
+  );
+  const writerTokenAccount = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    market.writerTokenMint,
+    wallet.publicKey!
+  );
+  const destTokenAccount = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    market.underlyingAssetMint,
+    wallet.publicKey!
+  );
+  const info = await token.getAccountInfo(optTokenAccount);
+  const ix = instructions.closePositionInstruction(
+    psyProgram, 
+    new anchor.BN(info.amount),
+    market, 
+    writerTokenAccount,
+    optTokenAccount,
+    destTokenAccount);
+  tx.add(ix);
+  await psyProgram.provider.send(tx);
 }
 
 export async function unlockGrant(
