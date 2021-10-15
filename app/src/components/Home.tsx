@@ -28,11 +28,11 @@ const Home: FC = () => {
   }
 
   return (
-    <div>
-      <Route path={[`/treasury/:page/:id`, '/treasury/:page', '/treasury']}>
+    <div style={{ textAlign: "center" }}>
+      <Route path={['/treasury/:page/:id', '/treasury/:page', '/treasury']}>
         <Treasury />
       </Route>
-      <Route path={`/contributor`}>
+      <Route path={['/contributor/:id', '/contributor']}>
         <Contributor />
       </Route>
       <Route exact path={`/`}>

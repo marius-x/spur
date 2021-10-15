@@ -1,13 +1,13 @@
 import React, { FC, useEffect, useState } from 'react';
-import { Switch, Route, useHistory, useRouteMatch, useParams } from "react-router-dom";
+import { Link, useHistory, useParams } from "react-router-dom";
 import {
   Button, 
   Card,
   Empty,
   List,
-  Space,
+  Space
 } from 'antd';
-import { PublicKey, SystemProgram, Transaction, TransferParams, TransferWithSeedParams } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { initGrant, revokeGrant} from '../lib/program';
 import GrantCreate, { GrantCreateParams } from './GrantCreate';
@@ -18,11 +18,6 @@ import { unitOfTimeToSec } from '../util/time';
 import usePsyProgram from '../hooks/psyProgram';
 import { GrantAccount } from '../lib/client';
 
-enum Page {
-  Empty,
-  Details,
-  Create
-}
 
 const Treasury: FC = () => {
   const history = useHistory();
@@ -33,6 +28,16 @@ const Treasury: FC = () => {
   const [grants, setGrants] = useState<GrantAccount[]>([]);
   const grant = grants.find(grant => grant.publicKey.toString() === id );
 
+  const loadGrants = React.useCallback(async () => {
+    if (!client || !wallet?.publicKey) {
+      setGrants([]);
+      return;
+    }
+    const foundGrants = await client.findGrantsBySender(wallet.publicKey);
+    const sortedGrants = foundGrants.sort((a: GrantAccount, b: GrantAccount): number => a.account.issueTs - b.account.issueTs);
+    setGrants(sortedGrants);
+  }, [client, wallet]);
+
   useEffect(() => {
     const setAsync = async () => {
       if (!client || !wallet?.publicKey) {
@@ -41,6 +46,8 @@ const Treasury: FC = () => {
       }
       const foundGrants = await client.findGrantsBySender(wallet.publicKey);
       const sortedGrants = foundGrants.sort((a: GrantAccount, b: GrantAccount): number => a.account.issueTs - b.account.issueTs);
+      const printGrant = foundGrants.find((g: GrantAccount) => g.publicKey.toString() === "AWWsFSNk9MawmjxAu5okKa14qzb2nDFSgvuQthNJUD75");
+      console.log("printGrant", printGrant);
       setGrants(sortedGrants);
     };
     setAsync();
@@ -64,6 +71,7 @@ const Treasury: FC = () => {
         create.cliff?.diff(create.duration[0], "seconds") || 0,
         unitOfTimeToSec(create.period),
         new PublicKey(create.recipient));
+      loadGrants();
       return true;
     } catch (err) {
       console.error("error initializing grant:", err);
@@ -89,12 +97,11 @@ const Treasury: FC = () => {
   }
 
   return (
-    <div>
-      <Space align="start" size="large">
-      <Space direction="vertical">
+    <Space align="start" size="large" style={{ textAlign: "left", marginLeft: "-120px" }}>
+      <Space direction="vertical" style={{marginTop: "12px"}}>
       <Button 
         type="primary"
-        onClick={() => history.push('/treasury/create') }
+        onClick={() => history.push('/treasury/create')}
       >
         + New Grant
       </Button>
@@ -126,8 +133,7 @@ const Treasury: FC = () => {
           )}
         </Card>
       </Space>
-      </Space>
-    </div>
+    </Space>
   );
 }
 

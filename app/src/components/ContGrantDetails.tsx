@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FC } from 'react';
-import { Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import {
   message,
   Button, 
@@ -20,8 +20,8 @@ interface props {
   wallet: PublicKey,
   psyProgram: Program,
   grant: GrantAccount,
-  onUnlock: (grantPk: PublicKey) => Promise<boolean>
-  onExercise: (grantPk: PublicKey) => Promise<boolean>
+  onUnlock: (grant: GrantAccount) => Promise<boolean>
+  onExercise: (grant: GrantAccount) => Promise<boolean>
 }
 
 const ContGrantDetails: FC<props> = ({
@@ -35,10 +35,13 @@ const ContGrantDetails: FC<props> = ({
   const [optionMintAmount, setOptionMintAmount] = useState(0);
   const [decimals, setDecimals] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [unlockLoading, setUnlockLoading] = useState(false);
+  const [exerciseLoading, setExerciseLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     const loadAsync = async () => {
+      try {
       setDecimals(await getMintDecimals(
         psyProgram.provider.connection, grant.account.mintAddress));
       if (!grant.account.optionMarketKey) {
@@ -61,6 +64,9 @@ const ContGrantDetails: FC<props> = ({
         const info = await mint.getAccountInfo(mintAccount);
         setOptionMintAmount(info.amount.toNumber());
       }
+      } catch (err) {
+        console.log(err);
+      }
       setLoading(false);
     };
     loadAsync();
@@ -71,21 +77,25 @@ const ContGrantDetails: FC<props> = ({
   }
 
   const handleUnlock = async () => {
-    const success = await onUnlock(grant.publicKey);
+    setUnlockLoading(true);
+    const success = await onUnlock(grant);
     if (success) {
       message.success("Grant successfully unlocked!");
     } else {
       message.error("Error unlocking grant!");
     }
+    setUnlockLoading(false);
   }
 
   const handleExercise = async () => {
-    const success = await onExercise(grant.publicKey);
+    setExerciseLoading(true);
+    const success = await onExercise(grant);
     if (success) {
       message.success("Grant successfully exercised!");
     } else {
       message.error("Error exercising grant!");
     }
+    setExerciseLoading(false);
   }
 
   const fixed2Decimals = (n: number): number => {
@@ -132,13 +142,14 @@ const ContGrantDetails: FC<props> = ({
             <Button 
               onClick={handleUnlock} 
               type="primary" 
-              style={{width: "120px", float: "right"}}
+              style={{width: "120px", float: "right", margin: "0px"}}
               disabled={!amountToUnlock}
+              loading={unlockLoading}
             >
               Unlock
             </Button>
           </Descriptions.Item>
-          {market && 
+          {market &&
             <Descriptions.Item labelStyle={{fontWeight: 600}} label="Exercise Amount">
               {displayAmountToExercise}
               <Button 
@@ -146,6 +157,7 @@ const ContGrantDetails: FC<props> = ({
                 type="primary" 
                 style={{width: "120px", float: "right"}}
                 disabled={!displayAmountToExercise}
+                loading={exerciseLoading}
               >
                 Exercise
               </Button>

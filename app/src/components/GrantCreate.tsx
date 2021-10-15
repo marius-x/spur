@@ -1,4 +1,4 @@
-import React, { FC } from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import {
   message,
@@ -11,15 +11,16 @@ import {
   Select,
   Switch,
   DatePicker,
-  Radio
+  Radio,
+  Empty
 } from 'antd';
 import moment from 'moment';
+import { useHistory } from 'react-router';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 const MangoMint = new PublicKey("7dXaobJ79k4GY6xNnfpXSeXiHcxE3tvVtE3GTwJ7BgTv");
-const SolMint = new PublicKey("77ZJLL97MSG8kFePoLp69YPYR2n9JXmajqwoNDAHfhLB");
 const UsdcMint = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 const CustomMint = new PublicKey("ZgDg4kcSHnVpfp7qhrpjsiZFFNtKNWtF1Y2DfoMUxgB");
 
@@ -28,10 +29,6 @@ const TOKEN_LIBRARY = [
   {
     name: "MNGO",
     address: MangoMint
-  },
-  {
-    name: "SOL",
-    address: SolMint
   },
   {
    name: "USDC",
@@ -59,7 +56,10 @@ interface props {
 }
 
 const GrantCreate: FC<props> = ({ onCreate }) => {
+  const history = useHistory()
   const [form] = Form.useForm<FormValues>();
+  const [grantCreated, setGrantCreated] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
   
   const handleSelectMintToken = (value: string) => {
     const token = TOKEN_LIBRARY.find(({ name }) => name === value);
@@ -96,6 +96,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
   }
 
   const handleSubmit = async (values: FormValues) => {
+    setCreateLoading(true);
     const success = await onCreate({
       amount: values.amount,
       cliff: values.cliff?.clone() ?? null,
@@ -106,11 +107,29 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
       recipient: values.recipient,
     });
     if (success) {
+      setGrantCreated(true);
+      // setTimeout(() => {
+      //   history.push('/treasury');
+      //   setGrantCreated(false);
+      // }, 5000);
       message.success("Successfully created new grant!");
     } else {
       message.error("Error creating grant!");
     }
+    setCreateLoading(false);
     // TODO: navigate to newly created grant
+  }
+
+  if (grantCreated) {
+    return <Empty 
+      description="Grant Created" 
+      image="/check-mark-green.png"
+    >
+      <Button onClick={() => {
+        history.push('/treasury');
+        setGrantCreated(false);
+      }}>OK</Button>
+    </Empty>
   }
 
   return (
@@ -131,7 +150,6 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
           label="Recipient"
           name="recipient"
           rules={[{ required: true, message: 'Please input recipient!' }]}
-          initialValue="JDgFLjT4fAYbPG9ucoQn6RZ2Shd42ybJCxp9hSbxWeqd"
         >
           <Input placeholder="Enter wallet address" />
         </Form.Item>
@@ -139,7 +157,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
         <Form.Item
           label="Mint Token"
           name="mintToken"
-          initialValue="MNGO"
+          initialValue="Other"
         >
           <Select onSelect={handleSelectMintToken}>
             {
@@ -223,7 +241,7 @@ const GrantCreate: FC<props> = ({ onCreate }) => {
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 5, span: 16 }}>
-          <Button type="primary" htmlType="submit">
+          <Button type="primary" htmlType="submit" loading={createLoading}>
             Create
           </Button>
         </Form.Item>

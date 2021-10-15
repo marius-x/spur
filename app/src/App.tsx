@@ -38,10 +38,12 @@ const App: FC = () => {
               <Link to="/">
                 <img src="/oc-blue.png" alt="" style={{ width: "234px", height: "50px", marginBottom: "6px" }} />
               </Link>
-              <Divider type="vertical" />
-              <Title level={5} style={{marginTop: "10px"}}>Treasury</Title>
+              {/* <Divider type="vertical" />
+              <Title level={5} style={{marginTop: "10px"}}>Treasury</Title> */}
             </Space>
-            <Space style={{ float: "right", margin: '6px' }}><WalletMultiButton style={{backgroundColor: "#24acfc"}} /></Space>
+            <Space style={{ float: "right", margin: '6px' }}>
+              <WalletMultiButton style={{backgroundColor: "#24acfc"}} />
+            </Space>
             <Space style={{ float: "right" }}>
               <Select size="large" defaultValue="devnet" bordered={false} onSelect={setEndpoint}>
                 <Option disabled value="mainnet-beta">mainnet</Option>
@@ -50,7 +52,7 @@ const App: FC = () => {
               </Select>
             </Space>
           </Header>
-          <Content style={{ padding: "24px 48px", minHeight: "384px"}}>
+          <Content style={{ padding: "24px 48px", minHeight: "384px", textAlign: "center"}}>
             <Switch>
               <Route path="/about"><About /></Route>
               <Route path="/"><Home /></Route>

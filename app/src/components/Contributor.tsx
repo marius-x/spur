@@ -1,4 +1,6 @@
+import React, { FC, useCallback, useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useHistory, useParams } from "react-router-dom";
 import {
   Button,
   Card, 
@@ -6,7 +8,8 @@ import {
   List,
   Space
 } from 'antd';
-import React, { FC, useEffect, useState } from 'react';
+
+import { PublicKey } from '@solana/web3.js';
 import { useProvider } from '../hooks/network';
 import usePsyProgram from '../hooks/psyProgram';
 import useClient from '../hooks/spurClient';
@@ -15,20 +18,26 @@ import { exercise, unlockGrant } from '../lib/program';
 import { shortSha } from '../util/text';
 import ContGrantDetails from './ContGrantDetails';
 
-enum Page {
-  Empty,
-  Details
-}
-
 const Contributor: FC = () => {
+  const history = useHistory();
+  const { id } = useParams<{ id: string}>();
   const provider = useProvider();
   const wallet = useWallet();
   const client = useClient();
   const psyProgram = usePsyProgram();
-  const [page, setPage] = useState<Page>(Page.Empty);
-  const [selectedGrant, setSelectedGrant] = useState<Nullable<GrantAccount>>(null);
 
   const [grants, setGrants] = useState<GrantAccount[]>([]);
+  const grant = grants.find(grant => grant.publicKey.toString() === id);
+
+  const reloadGrants = useCallback(async () => {
+    if (!client || !wallet?.publicKey) {
+      setGrants([]);
+      return;
+    }
+    const foundGrants = await client.findGrantsByRecipient(wallet.publicKey);
+    const sortedGrants = foundGrants.sort((a: GrantAccount, b: GrantAccount): number => a.account.issueTs - b.account.issueTs);
+    setGrants(sortedGrants);
+  }, [client, wallet]);
 
   useEffect(() => {
     const setAsync = async () => {
@@ -44,13 +53,13 @@ const Contributor: FC = () => {
   }, [client, wallet]);
 
   const handleSelectGrant = (grant: GrantAccount) => {
-    setSelectedGrant(grant);
-    setPage(Page.Details);
+    history.push(`/contributor/${grant.publicKey.toString()}`);
   }
 
-  const handleUnlockGrant = async (): Promise<boolean> => {
+  const handleUnlockGrant = async (grant: GrantAccount): Promise<boolean> => {
     try {
-      await unlockGrant(psyProgram!, client!, provider!, wallet, selectedGrant!);
+      await unlockGrant(psyProgram!, client!, provider!, wallet, grant);
+      reloadGrants();
       return true;
     } catch (err) {
       console.error(err);
@@ -58,16 +67,14 @@ const Contributor: FC = () => {
     }
   }
 
-  const handleExerciseGrant = async (): Promise<boolean> => {
-    if (!selectedGrant || !selectedGrant.account.optionMarketKey) {
-      return false;
-    }
+  const handleExerciseGrant = async (grant: GrantAccount): Promise<boolean> => {
     try {
       await exercise(
         psyProgram!,
         provider!,
         wallet,
-        selectedGrant!);
+        grant);
+      reloadGrants();
       return true;
     } catch (err) {
       console.error(err);
@@ -75,21 +82,22 @@ const Contributor: FC = () => {
     }
   }
 
-  const isSelected = (grant: GrantAccount): boolean => {
-    if (!selectedGrant || (page !== Page.Details)) { return false }
-    return selectedGrant.publicKey.equals(grant.publicKey);
+  const isSelected = (pk: PublicKey): boolean => {
+    if (!grant) {
+      return false; 
+    }
+    return grant.publicKey.equals(pk);
   }
 
   return (
-    <div>
-      <Space align="start" size="large">
+    <Space align="start" size="large" style={{ textAlign: "left", marginLeft: "-120px" }}>
       <Space direction="vertical">
       <List
         dataSource={grants}
         renderItem={grant => (
           <List.Item>
             <Button 
-              type={isSelected(grant) ? "default" : "link"} 
+              type={isSelected(grant.publicKey) ? "default" : "link"} 
               onClick={() => handleSelectGrant(grant)}
             >
               {shortSha(grant.publicKey.toString())}
@@ -101,11 +109,11 @@ const Contributor: FC = () => {
       <Space>
         <Card style={{ width: "648px", minHeight:"648px", borderRadius: "8px" }}>
           {
-            (page === Page.Details && selectedGrant) ? (
+            grant ? (
               <ContGrantDetails
                 wallet={wallet.publicKey!}
                 psyProgram={psyProgram!}
-                grant={selectedGrant}
+                grant={grant}
                 onUnlock={handleUnlockGrant}
                 onExercise={handleExerciseGrant}
               />
@@ -113,8 +121,7 @@ const Contributor: FC = () => {
           }
         </Card>
       </Space>
-      </Space>
-    </div>
+    </Space>
   );
 }
 
